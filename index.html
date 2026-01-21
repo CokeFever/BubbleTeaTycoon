@@ -1,0 +1,1872 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="手搖飲大王 - 在永吉路30巷開創你的飲料帝國！">
+    <title>🧋 手搖飲大王</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen:wght@400;700&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dirt: '#866043',
+                        dirtLight: '#a07855',
+                        dirtDark: '#5c4230',
+                        stone: '#7a7a7a',
+                        stoneLight: '#9a9a9a',
+                        stoneDark: '#5a5a5a',
+                        grass: '#5d823e',
+                        grassLight: '#7da05e',
+                        grassDark: '#3d622e',
+                        gold: '#e3b526',
+                        goldLight: '#f5d456',
+                        goldDark: '#b38916',
+                    },
+                    fontFamily: {
+                        pixel: ['VT323', 'monospace'],
+                        silkscreen: ['Silkscreen', 'monospace'],
+                    },
+                    boxShadow: {
+                        pixel: '4px 4px 0px 0px rgba(0,0,0,0.8)',
+                        pixelInset: 'inset 2px 2px 0px 0px rgba(255,255,255,0.2), inset -2px -2px 0px 0px rgba(0,0,0,0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html,
+        body,
+        #root {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: pan-x pan-y;
+        }
+
+        body {
+            background: #2d1f14;
+            font-family: 'VT323', monospace;
+        }
+
+        /* Pixel-perfect rendering */
+        img,
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* Custom scrollbar - hidden */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Pixel button press effect */
+        .pixel-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px 0px rgba(0, 0, 0, 0.8) !important;
+        }
+
+        /* Scene transition */
+        .scene-enter {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Floating animation for decorations */
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .float-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* Blinking cursor for text */
+        @keyframes blink {
+
+            0%,
+            50% {
+                opacity: 1;
+            }
+
+            51%,
+            100% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+        // ==================== CONSTANTS ====================
+        const INGREDIENTS = {
+            bases: [
+                { id: 'black-tea', name: '紅茶', cost: 5, attraction: 10, emoji: '🍵', trait: '上班族熱愛' },
+                { id: 'green-tea', name: '綠茶', cost: 5, attraction: 10, emoji: '🍃', trait: '清爽解膩' },
+                { id: 'oolong', name: '烏龍茶', cost: 7, attraction: 12, emoji: '🫖', trait: '高利潤品項' },
+                { id: 'winter-melon', name: '冬瓜茶', cost: 6, attraction: 8, emoji: '🧊', trait: '學生族首選' },
+            ],
+            toppings: [
+                { id: 'boba', name: '珍珠', cost: 5, attraction: 20, emoji: '⚫', trait: '經典必備' },
+                { id: 'pudding', name: '布丁', cost: 8, attraction: 15, emoji: '🍮', trait: '小孩最愛' },
+                { id: 'coconut-jelly', name: '椰果', cost: 6, attraction: 12, emoji: '🥥', trait: '口感爽脆' },
+                { id: 'grass-jelly', name: '仙草', cost: 5, attraction: 10, emoji: '🌿', trait: '消暑聖品' },
+                { id: 'taro', name: '芋泥', cost: 12, attraction: 25, emoji: '🍠', trait: '芋頭控瘋狂' },
+                { id: 'fun-guo', name: '粉粿', cost: 5, attraction: 15, emoji: '🟨', trait: '古早味' },
+                { id: 'noodles', name: '粉條', cost: 5, attraction: 10, emoji: '🥢', trait: '飽足感' },
+                { id: 'aiyu', name: '愛玉', cost: 8, attraction: 12, emoji: '🍋', trait: '清涼退火' },
+                { id: 'white-pearl', name: '寒天', cost: 10, attraction: 18, emoji: '⚪', trait: '低卡健康' },
+                { id: 'aloe', name: '蘆薈', cost: 9, attraction: 15, emoji: '🌵', trait: '養顏美容' },
+                { id: 'milk-foam', name: '奶蓋', cost: 15, attraction: 30, emoji: '☁️', trait: '網紅打卡' },
+            ],
+        };
+
+        const AI_COMPETITORS = [
+            { id: 1, name: '強尼紅茶公社', monthlyRevenue: 850000, tier: '傳奇', color: '#ff6b6b' },
+            { id: 2, name: '60嵐', monthlyRevenue: 620000, tier: '困難', color: '#ffa502' },
+            { id: 3, name: '大名本位', monthlyRevenue: 480000, tier: '普通', color: '#2ed573' },
+            { id: 4, name: 'OG智慧製茶', monthlyRevenue: 350000, tier: '穩健', color: '#1e90ff' },
+            { id: 5, name: '沒飲 Noin', monthlyRevenue: 220000, tier: '新手', color: '#a4b0be' },
+        ];
+
+
+
+        // ==================== UTILITY FUNCTIONS ====================
+        const formatMoney = (amount) => {
+            return `NT$${amount.toLocaleString()}`;
+        };
+
+        const calculateDrinkCost = (drink) => {
+            const base = INGREDIENTS.bases.find(b => b.id === drink.base);
+            const toppingsCost = drink.toppings.reduce((sum, t) => {
+                const topping = INGREDIENTS.toppings.find(tp => tp.id === t);
+                return sum + (topping?.cost || 0);
+            }, 0);
+            return (base?.cost || 0) + toppingsCost;
+        };
+
+        const calculateAttraction = (drink) => {
+            const base = INGREDIENTS.bases.find(b => b.id === drink.base);
+            const toppingsAttraction = drink.toppings.reduce((sum, t) => {
+                const topping = INGREDIENTS.toppings.find(tp => tp.id === t);
+                return sum + (topping?.attraction || 0);
+            }, 0);
+            return (base?.attraction || 0) + toppingsAttraction;
+        };
+
+        // ==================== PIXEL COMPONENTS ====================
+        const PixelButton = ({ children, onClick, variant = 'primary', size = 'md', disabled = false, className = '' }) => {
+            const variants = {
+                primary: 'bg-grass hover:bg-grassLight border-grassDark',
+                secondary: 'bg-dirt hover:bg-dirtLight border-dirtDark',
+                gold: 'bg-gold hover:bg-goldLight border-goldDark text-dirtDark',
+                danger: 'bg-red-600 hover:bg-red-500 border-red-800',
+            };
+            const sizes = {
+                sm: 'px-3 py-1 text-lg',
+                md: 'px-5 py-2 text-xl',
+                lg: 'px-8 py-3 text-2xl',
+            };
+
+            return (
+                <button
+                    onClick={onClick}
+                    disabled={disabled}
+                    className={`
+                        pixel-btn font-pixel text-white
+                        border-4 border-b-8 shadow-pixel
+                        transition-colors duration-100
+                        ${variants[variant]}
+                        ${sizes[size]}
+                        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                        ${className}
+                    `}
+                >
+                    {children}
+                </button>
+            );
+        };
+
+        const PixelPanel = ({ children, className = '', variant = 'dirt' }) => {
+            const variants = {
+                dirt: 'bg-dirt border-dirtDark',
+                stone: 'bg-stone border-stoneDark',
+                dark: 'bg-dirtDark border-black',
+            };
+
+            return (
+                <div className={`
+                    border-4 shadow-pixel shadow-pixelInset
+                    ${variants[variant]}
+                    ${className}
+                `}>
+                    {children}
+                </div>
+            );
+        };
+
+        const PixelTab = ({ tabs, activeTab, onTabChange }) => {
+            return (
+                <div className="flex gap-1">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => onTabChange(tab.id)}
+                            className={`
+                                pixel-btn font-pixel text-lg px-4 py-2
+                                border-4 border-b-0 transition-colors
+                                ${activeTab === tab.id
+                                    ? 'bg-dirt border-dirtDark text-white -mb-1 z-10'
+                                    : 'bg-stone border-stoneDark text-gray-300 hover:bg-stoneLight'}
+                            `}
+                        >
+                            {tab.icon} {tab.label}
+                        </button>
+                    ))}
+                </div>
+            );
+        };
+
+        // ==================== HUD COMPONENT ====================
+        const GameHUD = ({ gameState, onMenuClick }) => {
+            return (
+                <div className="absolute top-0 left-0 right-0 z-50 p-2">
+                    <PixelPanel className="p-2" variant="dark">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-2xl">💰</span>
+                                    <span className="font-pixel text-gold text-xl">
+                                        {formatMoney(gameState.money)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-2xl">⭐</span>
+                                    <span className="font-pixel text-goldLight text-xl">
+                                        {gameState.reputation}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-2xl">📅</span>
+                                    <span className="font-pixel text-white text-xl">
+                                        Day {gameState.day}
+                                    </span>
+                                </div>
+                            </div>
+                            <PixelButton size="sm" variant="secondary" onClick={onMenuClick}>
+                                ☰
+                            </PixelButton>
+                        </div>
+                    </PixelPanel>
+                </div>
+            );
+        };
+
+        // ==================== NAVIGATION BAR ====================
+        const NavigationBar = ({ currentScene, onSceneChange }) => {
+            const scenes = [
+                { id: 'street', label: '街道', icon: '🏘️' },
+                { id: 'store', label: '店面', icon: '🏪' },
+                { id: 'manage', label: '管理', icon: '📊' },
+            ];
+
+            return (
+                <div className="absolute bottom-0 left-0 right-0 z-50 p-2">
+                    <PixelPanel className="p-1" variant="dark">
+                        <div className="flex justify-around">
+                            {scenes.map((scene) => (
+                                <button
+                                    key={scene.id}
+                                    onClick={() => onSceneChange(scene.id)}
+                                    className={`
+                                        pixel-btn flex-1 mx-1 py-3 font-pixel text-lg
+                                        border-4 transition-all duration-100
+                                        ${currentScene === scene.id
+                                            ? 'bg-grass border-grassDark text-white shadow-pixel'
+                                            : 'bg-stone border-stoneDark text-gray-300 hover:bg-stoneLight'}
+                                    `}
+                                >
+                                    <div className="text-2xl">{scene.icon}</div>
+                                    <div>{scene.label}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </PixelPanel>
+                </div>
+            );
+        };
+
+        // ==================== ASSET HELPERS ====================
+        const drawPixelSprite = (ctx, x, y, scale, type, frame = 0, facing = 'front', heldItem = null) => {
+            // Simple Minecraft-style proportions
+            const p = scale; // 1 pixel unit
+
+            // Palettes
+            const PALETTES = {
+                student: { skin: '#ffeaa7', hair: '#2d3436', shirt: '#fff', pants: '#0984e3' },
+                worker: { skin: '#ffeaa7', hair: '#636e72', shirt: '#81ecec', pants: '#2d3436' },
+                hipster: { skin: '#fab1a0', hair: '#d63031', shirt: '#fdcb6e', pants: '#6c5ce7' },
+                tourist: { skin: '#74b9ff', hair: '#ffeaa7', shirt: '#ff7675', pants: '#55efc4' }
+            };
+            const colors = PALETTES[type] || PALETTES.student;
+
+            // Bobbing animation
+            const bob = Math.sin(frame * 0.2) * 2;
+            const legAngle = Math.sin(frame * 0.2) * 20;
+            const armAngle = Math.cos(frame * 0.2) * 20;
+
+            ctx.save();
+            ctx.translate(x, y + bob);
+
+            if (facing !== 'front') {
+                const dir = facing === 'left' ? -1 : 1;
+                ctx.scale(dir, 1);
+
+                // Head
+                ctx.fillStyle = colors.skin;
+                ctx.fillRect(-3 * p, -18 * p, 6 * p, 8 * p);
+                ctx.fillStyle = colors.hair;
+                ctx.fillRect(-4 * p, -18 * p, 4 * p, 8 * p);
+                ctx.fillRect(-3 * p, -19 * p, 6 * p, 2 * p);
+
+                // Body
+                ctx.fillStyle = colors.shirt;
+                ctx.fillRect(-2 * p, -10 * p, 4 * p, 8 * p);
+
+                // Arms
+                ctx.fillStyle = colors.skin;
+                ctx.save(); ctx.translate(0, -9 * p);
+                ctx.rotate(armAngle * Math.PI / 180);
+                ctx.fillRect(-1 * p, 0, 2 * p, 7 * p);
+
+                // Held Item (Side View)
+                if (heldItem === 'drink') {
+                    ctx.fillStyle = '#fab1a0'; // Cup
+                    ctx.fillRect(-1 * p, 5 * p, 3 * p, 4 * p);
+                    ctx.fillStyle = '#fff'; // Lid
+                    ctx.fillRect(-1 * p, 4 * p, 3 * p, 1 * p);
+                }
+
+                ctx.restore();
+
+                // Legs
+                ctx.fillStyle = colors.pants;
+                ctx.save(); ctx.translate(0, -2 * p);
+                ctx.rotate(legAngle * Math.PI / 180);
+                ctx.fillRect(-2 * p, 0, 4 * p, 8 * p); ctx.restore();
+                ctx.save(); ctx.translate(0, -2 * p);
+                ctx.rotate(-legAngle * Math.PI / 180);
+                ctx.fillRect(-2 * p, 0, 4 * p, 8 * p); ctx.restore();
+
+                ctx.restore();
+                return;
+            }
+
+            // Head (8x8)
+            ctx.fillStyle = colors.skin;
+            ctx.fillRect(-4 * p, -18 * p, 8 * p, 8 * p);
+            // Hair
+            ctx.fillStyle = colors.hair;
+            ctx.fillRect(-4 * p, -18 * p, 8 * p, 2 * p); // Top
+            ctx.fillRect(-4 * p, -18 * p, 2 * p, 6 * p); // Side L
+            ctx.fillRect(2 * p, -18 * p, 2 * p, 6 * p); // Side R
+
+            // Body (8x8)
+            ctx.fillStyle = colors.shirt;
+            ctx.fillRect(-4 * p, -10 * p, 8 * p, 8 * p);
+
+            // Arms
+            ctx.fillStyle = colors.skin;
+            ctx.fillRect(-6 * p, -10 * p, 2 * p, 8 * p); // L
+            ctx.fillRect(4 * p, -10 * p, 2 * p, 8 * p); // R
+
+            // Legs (Independent animation)
+            ctx.fillStyle = colors.pants;
+            // Leg L
+            ctx.save();
+            ctx.translate(-2 * p, -2 * p);
+            ctx.rotate(legAngle * Math.PI / 180);
+            ctx.fillRect(-2 * p, 0, 4 * p, 8 * p);
+            ctx.restore();
+            // Leg R
+            ctx.save();
+            ctx.translate(2 * p, -2 * p);
+            ctx.rotate(-legAngle * Math.PI / 180);
+            ctx.fillRect(-2 * p, 0, 4 * p, 8 * p);
+            ctx.restore();
+
+            ctx.restore();
+        };
+
+        const drawShopStorefront = (ctx, x, y, width, height, type, name, color) => {
+            // Main Building Block
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, width, height);
+
+            // Roof / Awning
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < width; i += 20) {
+                ctx.fillStyle = (i / 20) % 2 === 0 ? color : '#fff';
+                ctx.beginPath();
+                ctx.moveTo(x + i, y);
+                ctx.lineTo(x + i + 20, y);
+                ctx.lineTo(x + i + 10, y + 20);
+                ctx.fill();
+            }
+
+            // Signboard
+            ctx.fillStyle = '#2d3436';
+            ctx.fillRect(x + 10, y + 30, width - 20, 30);
+            ctx.fillStyle = '#fab1a0'; // Neon-ish
+            ctx.font = '16px "Silkscreen"';
+            ctx.textAlign = 'center';
+            ctx.fillText(name, x + width / 2, y + 52);
+
+            // Door / Window
+            ctx.fillStyle = '#b2bec3'; // Glass
+            ctx.fillRect(x + 20, y + 70, width - 40, height - 70);
+
+            // Frame
+            ctx.strokeStyle = '#636e72';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(x + 20, y + 70, width - 40, height - 70);
+        };
+
+        // ==================== MARKET RESEARCH MODAL ====================
+        const CompetitorModal = ({ shop, onClose }) => {
+            const menu = useMemo(() => {
+                // Generate random menu for competitor
+                return Array.from({ length: 5 }).map((_, i) => ({
+                    name: ['招牌', '特調', '拿鐵', '鮮奶', '冰茶'][i] + '茶',
+                    price: Math.floor(Math.random() * 30) + 30 + (shop.tier === '傳奇' ? 20 : 0)
+                }));
+            }, [shop]);
+
+            return (
+                <div className="absolute inset-0 bg-black/80 z-[60] flex items-center justify-center p-6" onClick={onClose}>
+                    <PixelPanel className="w-full max-w-sm p-4" variant="dirt" onClick={e => e.stopPropagation()}>
+                        <h2 className="font-silkscreen text-white text-xl mb-2 text-center" style={{ color: shop.color }}>
+                            {shop.name}
+                        </h2>
+                        <div className="text-center font-pixel text-stone mb-4">{shop.tier} 對手</div>
+
+                        <div className="bg-dirtDark p-3 border-2 border-stoneDark space-y-2">
+                            <h3 className="font-pixel text-gold mb-2 border-b border-stoneDark pb-1">市場調查 (Menu)</h3>
+                            {menu.map((m, i) => (
+                                <div key={i} className="flex justify-between font-pixel text-white">
+                                    <span>{m.name}</span>
+                                    <span>${m.price}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="font-pixel text-stoneLight text-xs mt-3 text-center">
+                            * 知己知彼，百戰百勝 *
+                        </p>
+                        <PixelButton variant="secondary" className="w-full mt-4" onClick={onClose}>
+                            關閉
+                        </PixelButton>
+                    </PixelPanel>
+                </div>
+            );
+        };
+
+        // ==================== STREET SCENE (Side View) ====================
+        const StreetScene = ({ gameState }) => {
+            const canvasRef = useRef(null);
+            const [selectedShop, setSelectedShop] = useState(null);
+
+            // Scrolling State
+            const scrollX = useRef(0);
+            const isDragging = useRef(false);
+            const lastX = useRef(0);
+
+            // Initial Shops Setup
+            const shops = useMemo(() => {
+                const list = [
+                    { id: 'player', name: gameState.shopName, color: '#e17055', isPlayer: true },
+                    ...gameState.competitors.map(c => ({
+                        id: c.id,
+                        name: c.name,
+                        color: c.color || '#a29bfe',
+                        isPlayer: false,
+                        tier: c.tier
+                    }))
+                ];
+                return list;
+            }, [gameState.competitors, gameState.shopName]);
+
+            // Pedestrians
+            const pedestrians = useRef(Array.from({ length: 20 }).map(() => ({
+                x: Math.random() * 800,
+                type: ['student', 'worker', 'hipster', 'tourist'][Math.floor(Math.random() * 4)],
+                speed: (Math.random() * 0.5 + 0.2) * (Math.random() > 0.5 ? 1 : -1),
+                frame: Math.random() * 100,
+                depth: Math.random() // 0 (far) to 1 (close)
+            }))).current;
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                let animationFrameId;
+
+                const resizeCanvas = () => {
+                    const parent = canvas.parentElement;
+                    if (parent) {
+                        canvas.width = parent.clientWidth;
+                        canvas.height = parent.clientHeight;
+                    }
+                };
+                window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
+
+                // Input Handlers
+                const onDown = (e) => {
+                    isDragging.current = true;
+                    lastX.current = e.touches ? e.touches[0].clientX : e.clientX;
+                };
+                const onMove = (e) => {
+                    if (!isDragging.current) return;
+                    e.preventDefault(); // Prevent page scroll
+                    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                    const dx = cx - lastX.current;
+                    scrollX.current += dx;
+                    lastX.current = cx;
+
+                    // Boundaries (Simple)
+                    const maxScroll = 0;
+                    const minScroll = -(shops.length * 160); // approx width
+                    if (scrollX.current > maxScroll) scrollX.current = maxScroll;
+                    if (scrollX.current < minScroll) scrollX.current = minScroll;
+                };
+                const onUp = (e) => {
+                    if (!isDragging.current) return; // Not dragging
+                    isDragging.current = false;
+
+                    // Click Detection (if moved very little)
+                    // Simplified: React onClick handles click, this handles drag
+                    // We can use native click vs drag distinction logic or just assume click if delta small.
+                    // Let's use React onClick on the canvas wrapper for clicks separately?
+                    // Actually, canvas handles all events. 
+                    // Let's checks click in global listener or reuse React's onClick
+                };
+
+                // Click detection needs coordinates mapped to scroll
+                const onClick = (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const cx = e.clientX - rect.left;
+                    const cy = e.clientY - rect.top;
+
+                    // Check shops
+                    let startX = 50 + scrollX.current;
+                    const shopY = canvas.height - 450; // Match new render layout
+                    const shopH = 150;
+                    const shopWidth = 140;
+                    const gap = 20;
+
+                    shops.forEach(shop => {
+                        if (cx >= startX && cx <= startX + shopWidth &&
+                            cy >= shopY && cy <= shopY + shopH) {
+                            if (!shop.isPlayer) {
+                                setSelectedShop(shop);
+                            }
+                        }
+                        startX += shopWidth + gap;
+                    });
+                };
+
+                canvas.addEventListener('mousedown', onDown);
+                canvas.addEventListener('touchstart', onDown);
+                window.addEventListener('mousemove', onMove);
+                window.addEventListener('touchmove', onMove, { passive: false });
+                window.addEventListener('mouseup', onUp);
+                window.addEventListener('touchend', onUp);
+                canvas.addEventListener('click', onClick);
+
+                const render = () => {
+                    const width = canvas.width;
+                    const height = canvas.height;
+
+                    // Sky
+                    ctx.fillStyle = '#87CEEB';
+                    ctx.fillRect(0, 0, width, height);
+
+                    // Ground
+                    ctx.fillStyle = '#95a5a6'; // Concrete sidewalk
+                    ctx.fillRect(0, height - 300, width, 300);
+
+                    ctx.save();
+                    // Apply Scroll only to World
+
+                    // --- Draw Shops ---
+                    let startX = 50 + scrollX.current;
+                    const shopY = height - 450; // Lifted up more
+                    const shopH = 150;
+                    const shopWidth = 140;
+                    const gap = 20;
+
+                    shops.forEach((shop) => {
+                        drawShopStorefront(ctx, startX, shopY, shopWidth, shopH, 'tea', shop.name, shop.color);
+
+                        // "You are Here" marker
+                        if (shop.isPlayer) {
+                            ctx.fillStyle = '#ffeaa7';
+                            ctx.font = '24px serif';
+                            ctx.textAlign = 'center';
+                            ctx.fillText('👇', startX + shopWidth / 2, shopY - 10);
+                        }
+
+                        startX += shopWidth + gap;
+                    });
+
+                    // --- Draw Pedestrians (Sorted by depth) ---
+                    // Sort by depth (far first, close last)
+                    const sortedPedestrians = [...pedestrians].sort((a, b) => a.depth - b.depth);
+
+                    sortedPedestrians.forEach(p => {
+                        p.x += p.speed;
+                        p.frame++;
+
+                        // Wrap around
+                        const limit = 2000; // Wider world
+                        if (p.x > limit) p.x = -50;
+                        if (p.x < -50) p.x = limit;
+
+                        const facing = p.speed > 0 ? 'right' : 'left';
+
+                        // Calculate Depth Effects
+                        // Y position: height - 290 (far) to height - 210 (close) relative to new ground
+                        const y = (height - 290) + (p.depth * 80);
+
+                        // Scale: 2.5 (far) to 3.5 (close)
+                        const scale = 2.5 + (p.depth * 1.5);
+
+                        // Apply scroll to pedestrians too
+                        const drawX = p.x + scrollX.current;
+
+                        // Only draw if on screen
+                        if (drawX > -50 && drawX < width + 50) {
+                            // Shadow (optional depth cue)
+                            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                            ctx.beginPath();
+                            ctx.ellipse(drawX, y, 6 * scale, 2 * scale, 0, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            drawPixelSprite(ctx, drawX, y, scale, p.type, p.frame, facing);
+                        }
+                    });
+
+                    ctx.restore();
+
+                    animationFrameId = requestAnimationFrame(render);
+                };
+                render();
+
+                return () => {
+                    window.removeEventListener('resize', resizeCanvas);
+                    canvas.removeEventListener('mousedown', onDown);
+                    canvas.removeEventListener('touchstart', onDown);
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('touchmove', onMove);
+                    window.removeEventListener('mouseup', onUp);
+                    window.removeEventListener('touchend', onUp);
+                    canvas.removeEventListener('click', onClick);
+                    cancelAnimationFrame(animationFrameId);
+                };
+            }, [shops]);
+
+            return (
+                <div className="scene-enter h-full flex flex-col relative overflow-hidden bg-sky-200">
+                    <canvas
+                        ref={canvasRef}
+                        className="w-full h-full block cursor-grab active:cursor-grabbing"
+                    />
+
+                    {/* UI Overlay */}
+                    <div className="absolute top-4 left-4 font-pixel text-white text-shadow pointer-events-none drop-shadow-md">
+                        <div className="text-xl">📍 永吉路 30 巷</div>
+                        <div className="text-xs text-stoneLight mt-1">左右滑動探索 / 點擊查看對手</div>
+                    </div>
+
+                    {selectedShop && (
+                        <CompetitorModal
+                            shop={selectedShop}
+                            onClose={() => setSelectedShop(null)}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // ==================== STORE SCENE (First-Person POS) ====================
+        const StoreScene = ({ gameState, onServeDrink, productionSpeed = 1 }) => {
+            const canvasRef = useRef(null);
+            const [localProfit, setLocalProfit] = useState(0);
+            const [currentOrder, setCurrentOrder] = useState(null);
+
+            // State: 'waiting' | 'approach' | 'ordering' | 'serving' | 'leaving'
+            const [customerState, setCustomerState] = useState('waiting');
+            const customerData = useRef({ type: 'student', x: 0, scale: 1 });
+            const progressRef = useRef(0); // 0 to 100 for animations
+
+            // Background Pedestrians
+            const bgPedestrians = useRef(Array.from({ length: 5 }).map(() => ({
+                x: Math.random() * 500,
+                speed: (Math.random() * 0.5 + 0.5) * (Math.random() > 0.5 ? 1 : -1),
+                type: ['student', 'worker', 'hipster', 'tourist'][Math.floor(Math.random() * 4)],
+                frame: Math.random() * 100
+            })));
+
+            // Audio/Visual feedback placeholder
+            const playDing = () => { };
+
+            useEffect(() => {
+                if (gameState.menu.length === 0) return;
+
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                let animationFrameId;
+                let frame = 0;
+
+                const resizeCanvas = () => {
+                    const parent = canvas.parentElement;
+                    if (parent && canvas) {
+                        canvas.width = parent.clientWidth;
+                        canvas.height = parent.clientHeight;
+                    }
+                };
+                window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
+
+                // === Logic Loop ===
+                const runLogic = () => {
+                    // Background Pedestrians Logic
+                    bgPedestrians.current.forEach(p => {
+                        p.x += p.speed;
+                        p.frame++;
+                        const limit = canvas.width + 50;
+                        if (p.x > limit) p.x = -50;
+                        if (p.x < -50) p.x = limit;
+                    });
+
+                    // 1. Update Game Logic
+                    if (customerState === 'waiting') {
+                        // Random chance to spawn customer
+                        if (Math.random() < 0.01 * productionSpeed) {
+                            customerData.current = {
+                                type: ['student', 'worker', 'hipster', 'tourist'][Math.floor(Math.random() * 4)],
+                                x: canvas.width / 2, // Center
+                                scale: 0.5 // Start small (far)
+                            };
+                            setCustomerState('approach');
+                            progressRef.current = 0;
+                        }
+                    } else if (customerState === 'approach') {
+                        // Walk towards camera
+                        progressRef.current += 2; // Speed
+                        // Scale 0.5 -> 8
+                        customerData.current.scale = 0.5 + (progressRef.current / 100) * 8;
+
+                        if (progressRef.current >= 100) {
+                            setCustomerState('ordering');
+                            // Pick Order
+                            const order = gameState.menu[Math.floor(Math.random() * gameState.menu.length)];
+                            setCurrentOrder(order);
+                            progressRef.current = 0;
+                        }
+                    } else if (customerState === 'ordering') {
+                        // Just wait a bit for "reading menu"
+                        progressRef.current++;
+                        if (progressRef.current > 60) { // 1 sec
+                            setCustomerState('serving');
+                            progressRef.current = 0;
+                        }
+                    } else if (customerState === 'serving') {
+                        progressRef.current += productionSpeed; // Build speed
+                        if (progressRef.current >= 100) {
+                            // Done!
+                            const drink = currentOrder;
+                            const cost = calculateDrinkCost(drink);
+                            const revenue = drink.price;
+
+                            setLocalProfit(p => p + revenue); // Display Revenue
+                            onServeDrink(revenue, cost);
+
+                            setCustomerState('leaving');
+                            progressRef.current = 0;
+                        }
+                    } else if (customerState === 'leaving') {
+                        progressRef.current += 2;
+                        customerData.current.x += 10; // Walk right to leave
+                        if (progressRef.current > 100) {
+                            setCustomerState('waiting');
+                            setCurrentOrder(null);
+                        }
+                    }
+                };
+
+                const render = () => {
+                    frame++;
+                    runLogic();
+
+                    const width = canvas.width;
+                    const height = canvas.height;
+
+                    // --- DRAWING LAYERS (Ordered) ---
+
+                    // 1. Background (Blurry Street)
+                    ctx.fillStyle = '#87CEEB'; // Sky
+                    ctx.fillRect(0, 0, width, height);
+
+                    // Cityscape / Buildings
+                    ctx.fillStyle = '#dfe6e9';
+                    ctx.fillRect(50, height / 2 - 100, 100, 150); // Building 1
+                    ctx.fillStyle = '#b2bec3';
+                    ctx.fillRect(200, height / 2 - 150, 120, 200); // Building 2
+                    ctx.fillStyle = '#fab1a0';
+                    ctx.fillRect(width - 150, height / 2 - 80, 80, 130); // Building 3
+
+                    // Street Floor
+                    ctx.fillStyle = '#7f8c8d'; // Street
+                    ctx.fillRect(0, height / 2 + 50, width, height / 2);
+
+                    // 2. Background Pedestrians (Walking sideways outside)
+                    bgPedestrians.current.forEach(p => {
+                        // Scale larger (1.8) to look closer
+                        const facing = p.speed > 0 ? 'right' : 'left';
+                        drawPixelSprite(ctx, p.x, height / 2 + 100, 1.8, p.type, p.frame, facing);
+                    });
+
+                    // 3. Customer Sprite (BEHIND Counter)
+                    if (customerState !== 'waiting') {
+                        const { x, scale, type } = customerData.current;
+                        // Bob while walking
+                        const bob = (customerState === 'approach' || customerState === 'leaving')
+                            ? Math.sin(frame * 0.2) * 10 : 0;
+
+                        // Facing logic for main customer
+                        let facing = 'front';
+                        let heldItem = null;
+                        if (customerState === 'leaving') {
+                            facing = 'right'; // Walk away sideways
+                            heldItem = 'drink';
+                        }
+
+                        drawPixelSprite(ctx, x, height - 130 + bob, scale, type, frame, facing, heldItem);
+                    }
+
+                    // 4. Countertop (Close - Occludes lower body of customer)
+                    ctx.fillStyle = '#dcdde1';
+                    ctx.fillRect(0, height - 150, width, 150); // Covers bottom 150px
+                    ctx.fillStyle = '#95a5a6'; // Edge
+                    ctx.fillRect(0, height - 150, width, 10);
+
+                    // 5. Drink on Counter (During Serving - On Top of Counter)
+                    if (customerState === 'serving') {
+                        // Fade in or slide in
+                        const alpha = Math.min(1, progressRef.current / 50);
+                        ctx.globalAlpha = alpha;
+                        const drinkX = width * 0.2; // Move to Left
+                        const drinkY = height - 100;
+
+                        ctx.fillStyle = '#fab1a0'; // Cup
+                        ctx.fillRect(drinkX, drinkY - 40, 30, 40);
+                        ctx.fillStyle = '#fff'; // Lid
+                        ctx.fillRect(drinkX - 2, drinkY - 45, 34, 5);
+
+                        ctx.globalAlpha = 1.0;
+                    }
+
+                    animationFrameId = requestAnimationFrame(render);
+                };
+                render();
+
+                return () => {
+                    window.removeEventListener('resize', resizeCanvas);
+                    cancelAnimationFrame(animationFrameId);
+                };
+            }, [gameState.menu, productionSpeed, customerState]); // Re-bind on state change logic
+
+            return (
+                <div className="scene-enter h-full flex flex-col p-4 pt-20 pb-28 overflow-hidden relative">
+                    <h2 className="font-silkscreen text-gold text-2xl mb-4 text-center z-10 drop-shadow-md">
+                        {gameState.shopName}
+                    </h2>
+
+                    {/* Viewport */}
+                    <div className="flex-1 relative border-4 border-dirtDark rounded-lg overflow-hidden bg-black/20 text-center">
+                        <canvas
+                            ref={canvasRef}
+                            className="w-full h-full object-cover"
+                        />
+
+                        {/* POS Screen Overlay */}
+                        <div className="absolute bottom-4 right-4 w-48 h-32 bg-stoneDark border-4 border-stone p-2 rounded shadow-xl opacity-90">
+                            <div className="bg-black w-full h-full p-2 font-pixel text-left flex flex-col justify-between">
+                                {currentOrder ? (
+                                    <>
+                                        <div className="text-grassLight text-sm">ORDER_ID: #{Math.floor(Math.random() * 999)}</div>
+                                        <div>
+                                            <div className="text-white text-lg leading-tight">{currentOrder.name}</div>
+                                            <div className="text-stoneLight text-xs mt-1">
+                                                {currentOrder.base} + {currentOrder.toppings.length}
+                                            </div>
+                                        </div>
+                                        <div className="text-right text-gold text-xl border-t border-stoneDark pt-1">
+                                            ${currentOrder.price}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-stone text-center animate-pulse">
+                                        等待點單...<br />SYSTEM READY
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Info Status */}
+                    <PixelPanel className="mt-4 p-4 flex justify-between items-center" variant="stone">
+                        <div className="text-left">
+                            <div className="font-pixel text-stoneLight text-sm">今日來客</div>
+                            <div className="font-pixel text-white text-xl">
+                                {Math.floor(localProfit / 30)} 人
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="font-pixel text-stoneLight text-sm">自動營收</div>
+                            <div className="font-pixel text-gold text-2xl">
+                                {formatMoney(localProfit)}
+                            </div>
+                        </div>
+                    </PixelPanel>
+                </div>
+            );
+        };
+
+        // ==================== MANAGE SCENE ====================
+        const ManageScene = ({ gameState, onUpdateGameState, projection }) => {
+            const [activeTab, setActiveTab] = useState('menu');
+            const [editingDrink, setEditingDrink] = useState(null); // null = list view, object = editing
+            const [drinkToDelete, setDrinkToDelete] = useState(null);
+            const [rankPeriod, setRankPeriod] = useState('monthly'); // daily, monthly, total
+
+            const tabs = [
+                { id: 'menu', label: '菜單', icon: '📜' },
+                { id: 'equipment', label: '設備', icon: '⚙️' },
+                { id: 'staff', label: '人事', icon: '👥' },
+                { id: 'finance', label: '財務', icon: '💹' },
+                { id: 'rank', label: '排行', icon: '🏆' },
+            ];
+
+            // --- Menu Editor Components ---
+            const MenuEditor = ({ drink, onSave, onCancel }) => {
+                const [name, setName] = useState(drink?.name || '新品項');
+                const [base, setBase] = useState(drink?.base || INGREDIENTS.bases[0].id);
+                const [toppings, setToppings] = useState(drink?.toppings || []);
+                const [price, setPrice] = useState(drink?.price || 50);
+
+                const currentCost = calculateDrinkCost({ base, toppings });
+                const currentAttraction = calculateAttraction({ base, toppings });
+
+                const toggleTopping = (tid) => {
+                    if (toppings.includes(tid)) {
+                        setToppings(toppings.filter(t => t !== tid));
+                    } else {
+                        if (toppings.length >= 3) return; // Max 3 toppings
+                        setToppings([...toppings, tid]);
+                    }
+                };
+
+                return (
+                    <div className="flex flex-col h-full">
+                        <h3 className="font-pixel text-gold text-xl mb-4">
+                            {drink ? '✏️ 編輯飲品' : '✨ 研發新品'}
+                        </h3>
+
+                        <div className="flex-1 overflow-y-auto space-y-4">
+                            {/* Name Input */}
+                            <div>
+                                <label className="block font-pixel text-stone mb-1">飲品名稱</label>
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    maxLength={10}
+                                    className="w-full bg-dirtDark border-2 border-stoneDark text-white p-2 font-pixel text-lg focus:outline-none focus:border-gold"
+                                />
+                            </div>
+
+                            {/* Base Selection */}
+                            <div>
+                                <label className="block font-pixel text-stone mb-1">基底茶</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {INGREDIENTS.bases.map(b => (
+                                        <button
+                                            key={b.id}
+                                            onClick={() => setBase(b.id)}
+                                            className={`
+                                                p-2 border-2 text-left transition-colors
+                                                ${base === b.id
+                                                    ? 'bg-grass border-grassDark text-white'
+                                                    : 'bg-stoneDark border-stone text-stoneLight'}
+                                            `}
+                                        >
+                                            <div className="font-pixel">{b.emoji} {b.name}</div>
+                                            <div className="font-pixel text-xs opacity-75">${b.cost} | ⭐{b.attraction}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Toppings Selection */}
+                            <div>
+                                <label className="block font-pixel text-stone mb-1">配料 (最多3種)</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {INGREDIENTS.toppings.map(t => (
+                                        <button
+                                            key={t.id}
+                                            onClick={() => toggleTopping(t.id)}
+                                            className={`
+                                                p-2 border-2 text-left transition-colors
+                                                ${toppings.includes(t.id)
+                                                    ? 'bg-dirt border-dirtDark text-white'
+                                                    : 'bg-stoneDark border-stone text-stoneLight'}
+                                            `}
+                                        >
+                                            <div className="font-pixel">{t.emoji} {t.name}</div>
+                                            <div className="font-pixel text-xs opacity-75">${t.cost} | ⭐{t.attraction}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Price Setting */}
+                            <div>
+                                <label className="block font-pixel text-stone mb-1">售價與分析</label>
+                                <div className="flex items-center gap-4 mb-2">
+                                    <button
+                                        onClick={() => setPrice(p => Math.max(0, p - 5))}
+                                        className="bg-stoneDark w-10 h-10 text-white font-bold border-2 border-stone"
+                                    >-</button>
+                                    <div className="flex-1 text-center bg-dirtDark p-2 border-2 border-stoneDark text-gold text-2xl font-pixel">
+                                        ${price}
+                                    </div>
+                                    <button
+                                        onClick={() => setPrice(p => p + 5)}
+                                        className="bg-stoneDark w-10 h-10 text-white font-bold border-2 border-stone"
+                                    >+</button>
+                                </div>
+                                <div className="text-sm font-pixel text-stoneLight space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>總成本:</span> <span className="text-white">${currentCost}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>單杯毛利:</span> <span className={price - currentCost > 0 ? 'text-grassLight' : 'text-red-400'}>${price - currentCost}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>總吸引力:</span> <span className="text-gold">{currentAttraction}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 mt-4 pt-4 border-t-2 border-stoneDark">
+                            <PixelButton variant="secondary" className="flex-1" onClick={onCancel}>取消</PixelButton>
+                            <PixelButton
+                                variant="gold"
+                                className="flex-1"
+                                onClick={() => onSave({
+                                    id: drink?.id || Date.now(),
+                                    name, base, toppings, price
+                                })}
+                            >
+                                確定
+                            </PixelButton>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Upgrade Item Component ---
+            const UpgradeItem = ({ id, currentLevel, data, onUpgrade }) => {
+                const nextLevel = currentLevel + 1;
+                const cost = data.baseCost * Math.pow(1.5, currentLevel);
+                const isMax = currentLevel >= data.maxLevel;
+                const canAfford = gameState.money >= cost;
+
+                return (
+                    <div className="bg-dirtDark p-3 mb-2 border-2 border-stoneDark">
+                        <div className="flex justify-between items-start mb-2">
+                            <div>
+                                <div className="font-pixel text-white text-lg">{data.name}</div>
+                                <div className="font-pixel text-stone text-sm">Lv.{currentLevel} / {data.maxLevel}</div>
+                            </div>
+                            <div className="text-2xl">{data.icon}</div>
+                        </div>
+                        <p className="font-pixel text-stoneLight text-sm mb-3 h-10 line-clamp-2">
+                            {data.description}
+                        </p>
+                        {isMax ? (
+                            <div className="bg-stoneDark text-stone text-center py-2 font-pixel border-2 border-stone">
+                                已達最高等級
+                            </div>
+                        ) : (
+                            <PixelButton
+                                variant={canAfford ? 'gold' : 'secondary'}
+                                size="sm"
+                                className="w-full flex justify-between items-center"
+                                onClick={() => onUpgrade(id, cost)}
+                                disabled={!canAfford}
+                            >
+                                <span>升級</span>
+                                <span>${formatMoney(cost)}</span>
+                            </PixelButton>
+                        )}
+                    </div>
+                );
+            };
+
+            const StaffCard = ({ title, count, salary, type }) => (
+                <div className="bg-dirtDark p-3 mb-2 border-2 border-stoneDark flex justify-between items-center">
+                    <div>
+                        <div className="font-pixel text-white text-lg">{title}</div>
+                        <div className="font-pixel text-stone text-sm">${formatMoney(salary)}/月</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <PixelButton
+                            variant="secondary"
+                            size="sm"
+                            disabled={count <= 0}
+                            onClick={() => {
+                                onUpdateGameState(prev => ({
+                                    ...prev,
+                                    staff: { ...prev.staff, [type]: prev.staff[type] - 1 }
+                                }));
+                            }}
+                        >-</PixelButton>
+                        <span className="font-pixel text-xl w-6 text-center">{count}</span>
+                        <PixelButton
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                                onUpdateGameState(prev => ({
+                                    ...prev,
+                                    staff: { ...prev.staff, [type]: prev.staff[type] + 1 }
+                                }));
+                            }}
+                        >+</PixelButton>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="scene-enter h-full flex flex-col p-4 pt-20 pb-28">
+                    {!editingDrink && (
+                        <PixelTab tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+                    )}
+
+                    <PixelPanel className="flex-1 mt-0 p-4 overflow-y-auto">
+                        {/* MENU EDITOR MODE */}
+                        {editingDrink && typeof editingDrink === 'object' && (
+                            <MenuEditor
+                                drink={editingDrink.id ? editingDrink : null}
+                                onCancel={() => setEditingDrink(null)}
+                                onSave={(newDrink) => {
+                                    onUpdateGameState(prev => {
+                                        const isNew = !prev.menu.find(d => d.id === newDrink.id);
+                                        let newMenu = isNew ? [...prev.menu, newDrink] : prev.menu.map(d => d.id === newDrink.id ? newDrink : d);
+                                        return { ...prev, menu: newMenu };
+                                    });
+                                    setEditingDrink(null);
+                                }}
+                            />
+                        )}
+
+                        {/* NORMAL TABS */}
+                        {!editingDrink && activeTab === 'menu' && (
+                            <div>
+                                <h3 className="font-pixel text-gold text-xl mb-4">📜 菜單管理 ({gameState.menu.length}/10)</h3>
+                                {gameState.menu.map((drink) => (
+                                    <div key={drink.id} className="bg-dirtDark p-3 mb-2 border-2 border-stoneDark relative group">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-pixel text-white text-lg">
+                                                🧋 {drink.name}
+                                            </span>
+                                            <span className="font-pixel text-gold text-lg">
+                                                ${drink.price}
+                                            </span>
+                                        </div>
+                                        <div className="font-pixel text-stone text-sm mt-1 mb-2">
+                                            成本: ${calculateDrinkCost(drink)} |
+                                            吸引力: {calculateAttraction(drink)}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setEditingDrink(drink)}
+                                                className="flex-1 bg-stoneDark text-white font-pixel py-1 border-2 border-stone hover:bg-stone"
+                                            >
+                                                編輯
+                                            </button>
+                                            <button
+                                                onClick={() => setDrinkToDelete(drink)}
+                                                className="flex-1 bg-red-900 text-red-100 font-pixel py-1 border-2 border-red-800 hover:bg-red-800"
+                                            >
+                                                刪除
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {gameState.menu.length < 10 ? (
+                                    <PixelButton
+                                        variant="secondary"
+                                        size="sm"
+                                        className="w-full mt-4"
+                                        onClick={() => setEditingDrink({})}
+                                    >
+                                        + 新增飲品
+                                    </PixelButton>
+                                ) : (
+                                    <div className="text-center font-pixel text-stone mt-4">菜單已滿</div>
+                                )}
+                            </div>
+                        )}
+
+                        {!editingDrink && activeTab === 'equipment' && (
+                            <div>
+                                <h3 className="font-pixel text-gold text-xl mb-4">⚙️ 設備升級</h3>
+                                {[
+                                    { id: 'teaMachine', name: '萃茶機', icon: '♨️', description: '加快製作速度，提升顧客翻桌率。', maxLevel: 5, baseCost: 2000 },
+                                    { id: 'iceMachine', name: '製冰機', icon: '❄️', description: '提升飲品品質，微幅增加吸引力與轉化率。', maxLevel: 3, baseCost: 5000 },
+                                    { id: 'sealingMachine', name: '封口機', icon: '🥤', description: '加快打包速度，進一步提升製作效率。', maxLevel: 5, baseCost: 1500 },
+                                    { id: 'marketing', name: '社群行銷', icon: '📢', description: '提升品牌知名度，增加基礎過路客流量。', maxLevel: 10, baseCost: 3000 }, // New pseudo-equipment
+                                ].map(item => (
+                                    <UpgradeItem
+                                        key={item.id}
+                                        id={item.id}
+                                        currentLevel={gameState.equipment[item.id] || 0}
+                                        data={item}
+                                        onUpgrade={(id, cost) => {
+                                            onUpdateGameState(prev => ({
+                                                ...prev,
+                                                money: prev.money - cost,
+                                                equipment: {
+                                                    ...prev.equipment,
+                                                    [id]: (prev.equipment[id] || 0) + 1
+                                                }
+                                            }));
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {!editingDrink && activeTab === 'staff' && (
+                            <div>
+                                <h3 className="font-pixel text-gold text-xl mb-4">👥 人力資源</h3>
+                                <div className="mb-6 p-3 bg-dirt border-2 border-dirtDark">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-pixel text-white text-lg">24小時營業</span>
+                                        <button
+                                            onClick={() => onUpdateGameState(prev => ({ ...prev, is24h: !prev.is24h }))}
+                                            className={`
+                                                w-16 h-8 rounded-full border-2 transition-colors relative
+                                                ${gameState.is24h ? 'bg-grass border-grassDark' : 'bg-stoneDark border-stone'}
+                                            `}
+                                        >
+                                            <div className={`
+                                                absolute top-1 w-5 h-5 bg-white rounded-full transition-all
+                                                ${gameState.is24h ? 'right-1' : 'left-1'}
+                                            `}></div>
+                                        </button>
+                                    </div>
+                                    <p className="font-pixel text-stoneLight text-sm">
+                                        開啟後將進行三班制輪替，人力成本 x3，但可獲得夜間營收。
+                                    </p>
+                                </div>
+
+                                <StaffCard title="工讀生 (Part-time)" count={gameState.staff.partTime} salary={35000} type="partTime" />
+                                <StaffCard title="正職人員 (Full-time)" count={gameState.staff.fullTime} salary={45000} type="fullTime" />
+                                <StaffCard title="店經理 (Manager)" count={gameState.staff.manager} salary={60000} type="manager" />
+                            </div>
+                        )}
+
+                        {!editingDrink && activeTab === 'finance' && (
+                            <div>
+                                <h3 className="font-pixel text-gold text-xl mb-4">💹 財務報表</h3>
+                                <div className="space-y-3">
+                                    <div className="bg-dirtDark p-3 border-2 border-stoneDark">
+                                        <div className="font-pixel text-stone">現金資產</div>
+                                        <div className="font-pixel text-gold text-2xl">
+                                            {formatMoney(gameState.money)}
+                                        </div>
+                                    </div>
+                                    <div className="bg-dirtDark p-3 border-2 border-stoneDark">
+                                        <div className="font-pixel text-stone">本月預估淨利</div>
+                                        <div className={`font-pixel text-2xl ${projection >= 0 ? 'text-grassLight' : 'text-red-400'}`}>
+                                            {formatMoney(projection)}
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-sm mt-1">
+                                            (基於當前人流與菜單配置)
+                                        </div>
+                                    </div>
+                                    <div className="border-t-2 border-dashed border-stone my-4"></div>
+                                    <div className="bg-dirtDark p-3 border-2 border-stoneDark">
+                                        <div className="font-pixel text-white mb-2">支出細項 (月)</div>
+                                        <div className="flex justify-between font-pixel text-stoneLight text-sm">
+                                            <span>店面租金</span>
+                                            <span className="text-red-300">-${formatMoney(gameState.financials.rent)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-stoneLight text-sm">
+                                            <span>人力成本 {gameState.is24h && '(x3)'}</span>
+                                            <span className="text-red-300">
+                                                -${formatMoney(
+                                                    (gameState.staff.partTime * 35000 +
+                                                        gameState.staff.fullTime * 45000 +
+                                                        gameState.staff.manager * 60000) * (gameState.is24h ? 3 : 1)
+                                                )}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {!editingDrink && activeTab === 'rank' && (
+                            <div className="space-y-2">
+                                <h3 className="font-pixel text-gold text-xl mb-4">🏆 排行榜</h3>
+
+                                {/* Sub-tabs */}
+                                <div className="flex gap-2 mb-4">
+                                    {['daily', 'monthly', 'total'].map(p => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setRankPeriod(p)}
+                                            className={`flex-1 py-1 font-pixel text-sm border-2 ${rankPeriod === p
+                                                ? 'bg-gold text-dirtDark border-white'
+                                                : 'bg-dirtDark text-stone border-stoneDark'
+                                                }`}
+                                        >
+                                            {{ daily: '每日', monthly: '每月', total: '累積' }[p]}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {(() => {
+                                    // Prepare Data
+                                    const getMetric = (c, isPlayer) => {
+                                        if (isPlayer) return gameState.metrics?.[rankPeriod] || 0;
+                                        // AI Logic
+                                        if (rankPeriod === 'daily') return Math.round(c.monthlyRevenue / 30);
+                                        if (rankPeriod === 'total') return c.monthlyRevenue * 12;
+                                        return c.monthlyRevenue;
+                                    };
+
+                                    const list = [
+                                        ...(gameState.competitors || []).map(c => ({ ...c, isPlayer: false })),
+                                        { id: 'player', name: gameState.shopName, isPlayer: true, color: '#e17055', tier: '玩家' }
+                                    ].map(c => ({
+                                        ...c,
+                                        value: getMetric(c, c.isPlayer)
+                                    })).sort((a, b) => b.value - a.value);
+
+                                    return list.map((shop, i) => (
+                                        <div
+                                            key={shop.id}
+                                            className={`p-3 border-2 flex justify-between items-center ${shop.isPlayer
+                                                ? 'bg-grass border-grassDark'
+                                                : 'bg-dirtDark border-stoneDark'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className={`font-pixel text-xl ${shop.isPlayer ? 'text-white' : 'text-gold'}`}>
+                                                    #{i + 1}
+                                                </span>
+                                                <span className="font-pixel text-white">{shop.name}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className={`font-pixel ${shop.isPlayer ? 'text-white' : 'text-goldLight'}`}>
+                                                    {formatMoney(shop.value)}
+                                                </div>
+                                                <div className="font-pixel text-sm" style={{ color: shop.color }}>
+                                                    {shop.tier}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        )}
+                        {drinkToDelete && (
+                            <DialogModal
+                                title="刪除確認"
+                                message={`確定要刪除 ${drinkToDelete.name} 嗎？`}
+                                confirmText="刪除"
+                                variant="stone"
+                                onCancel={() => setDrinkToDelete(null)}
+                                onConfirm={() => {
+                                    onUpdateGameState(prev => ({
+                                        ...prev,
+                                        menu: prev.menu.filter(m => m.id !== drinkToDelete.id)
+                                    }));
+                                    setDrinkToDelete(null);
+                                }}
+                            />
+                        )}
+                    </PixelPanel>
+                </div>
+            );
+        };
+
+        const INITIAL_STATE = {
+            shopName: '我的手搖店', // Default name
+            hasStarted: false, // Onboarding flag
+            money: 100000,
+            reputation: 0,
+            day: 1,
+            metrics: { daily: 0, monthly: 0, total: 0 },
+            menu: [
+                { id: 1, base: 'black-tea', toppings: ['boba'], price: 45, name: '珍珠紅茶' },
+                { id: 2, base: 'green-tea', toppings: [], price: 25, name: '純綠茶' },
+            ],
+            equipment: {
+                teaMachine: 1,
+                iceMachine: 1,
+                sealingMachine: 1,
+                marketing: 0,
+            },
+            staff: {
+                partTime: 1,
+                fullTime: 0,
+                manager: 0,
+            },
+            financials: {
+                rent: 50000,
+            },
+            competitors: AI_COMPETITORS, // Dynamic copy
+            is24h: false,
+            lastOnline: Date.now(),
+        };
+
+        // ==================== OFFLINE REPORT MODAL ====================
+        const OfflineReport = ({ data, onClose }) => {
+            if (!data) return null;
+            return (
+                <div className="absolute inset-0 bg-black/90 z-[60] flex items-center justify-center p-6">
+                    <PixelPanel className="w-full max-w-sm p-6" variant="gold">
+                        <h2 className="font-silkscreen text-dirtDark text-2xl mb-4 text-center">
+                            😴 離線報告
+                        </h2>
+                        <div className="space-y-4 mb-6">
+                            <div className="bg-white/50 p-3 rounded border-2 border-dirtDark">
+                                <div className="font-pixel text-dirtDark text-lg text-center mb-1">離線時間</div>
+                                <div className="font-pixel text-dirtDark text-3xl text-center font-bold">
+                                    {data.hours.toFixed(1)} <span className="text-sm">小時</span>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between font-pixel text-xl text-dirtDark">
+                                    <span>總營收</span>
+                                    <span className="text-grassDark">+${formatMoney(data.revenue)}</span>
+                                </div>
+                                <div className="flex justify-between font-pixel text-lg text-red-700">
+                                    <span>成本與支出</span>
+                                    <span>-${formatMoney(data.expenses)}</span>
+                                </div>
+                                <div className="border-t-2 border-dashed border-dirtDark my-2"></div>
+                                <div className="flex justify-between font-pixel text-2xl font-bold text-dirtDark">
+                                    <span>淨利潤</span>
+                                    <span className={data.net >= 0 ? 'text-grassDark' : 'text-red-700'}>
+                                        {data.net >= 0 ? '+' : ''}${formatMoney(data.net)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <PixelButton variant="primary" className="w-full" onClick={onClose}>
+                            收下現金
+                        </PixelButton>
+                    </PixelPanel>
+                </div>
+            );
+        };
+
+        const DialogModal = ({ title, message, onConfirm, onCancel, confirmText = '確定', cancelText = '取消', variant = 'dirt' }) => (
+            <div className="absolute inset-0 bg-black/80 z-[70] flex items-center justify-center p-6">
+                <PixelPanel className="w-full max-w-sm p-6" variant={variant}>
+                    <h2 className="font-silkscreen text-gold text-xl mb-4 text-center">{title}</h2>
+                    <p className="font-pixel text-white text-lg mb-6 text-center">{message}</p>
+                    <div className="flex gap-4">
+                        {onCancel && (
+                            <PixelButton variant="secondary" className="flex-1" onClick={onCancel}>
+                                {cancelText}
+                            </PixelButton>
+                        )}
+                        <PixelButton variant="primary" className="flex-1" onClick={onConfirm}>
+                            {confirmText}
+                        </PixelButton>
+                    </div>
+                </PixelPanel>
+            </div>
+        );
+
+        // ==================== INTRO SCENE ====================
+        const IntroScene = ({ onStart }) => {
+            const [step, setStep] = useState(0);
+            const [shopName, setShopName] = useState('');
+
+            const story = [
+                { text: "2024年，台北...", icon: "🏙️" },
+                { text: "信義區，永吉路30巷...", icon: "🛵" },
+                { text: "這裡是手搖飲的一級戰區。", icon: "⚔️" },
+                { text: "無數品牌在此崛起，也在此殞落。", icon: "📉" },
+                { text: "而你，決定帶著這筆積蓄...", icon: "💰" },
+                { text: "在這裡創造屬於你的傳奇！", icon: "👑" },
+            ];
+
+            const nextStep = () => {
+                if (step < story.length) {
+                    setStep(step + 1);
+                }
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (shopName.trim()) {
+                    onStart(shopName);
+                }
+            };
+
+            return (
+                <div className="absolute inset-0 bg-black z-[100] flex flex-col items-center justify-center p-6 scene-enter text-center">
+                    {step < story.length ? (
+                        <div onClick={nextStep} className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                            <div className="text-6xl mb-6 float-animation">{story[step].icon}</div>
+                            <p className="font-pixel text-white text-2xl mb-8 leading-relaxed typing-effect">
+                                {story[step].text}
+                            </p>
+                            <div className="font-pixel text-stone animate-pulse text-sm mt-10">
+                                點擊繼續...
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-sm animate-fade-in">
+                            <h2 className="font-silkscreen text-gold text-2xl mb-6">開店準備</h2>
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block font-pixel text-stoneLight mb-2 text-left">決定你的店名</label>
+                                    <input
+                                        type="text"
+                                        value={shopName}
+                                        onChange={(e) => setShopName(e.target.value)}
+                                        placeholder="例：超級好喝茶"
+                                        maxLength={10}
+                                        className="w-full bg-dirtDark border-4 border-stone text-white p-3 font-pixel text-xl focus:border-gold outline-none"
+                                        autoFocus
+                                    />
+                                </div>
+                                <PixelButton
+                                    variant="gold"
+                                    size="lg"
+                                    className="w-full mt-4"
+                                    disabled={!shopName.trim()}
+                                >
+                                    開業！ 🎊
+                                </PixelButton>
+                            </form>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // ==================== MAIN APP ====================
+        const App = () => {
+            const [currentScene, setCurrentScene] = useState('store');
+            const [offlineReport, setOfflineReport] = useState(null);
+            const [showMenu, setShowMenu] = useState(false);
+            const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+            // Helper: Calculate standard finance metrics from state
+            const calculateFinance = (state) => {
+                if (state.menu.length === 0) return { hourlyProfit: 0, monthlyProjection: -state.financials.rent, productionSpeed: 1 };
+
+                const avgPrice = state.menu.reduce((sum, d) => sum + d.price, 0) / state.menu.length;
+                const avgCost = state.menu.reduce((sum, d) => sum + calculateDrinkCost(d), 0) / state.menu.length;
+                const avgAttraction = state.menu.reduce((sum, d) => sum + calculateAttraction(d), 0) / state.menu.length;
+
+                // Equipment bonuses
+                const speedBonus = (state.equipment.teaMachine * 0.2) + (state.equipment.sealingMachine * 0.2);
+                const qualityBonus = state.equipment.iceMachine * 0.1;
+                const marketingBonus = state.equipment.marketing * 0.05;
+
+                const baseTraffic = 100 * (1 + (state.reputation / 1000)) * (1 + marketingBonus);
+                const conversionRate = Math.min(0.8, (0.3 + (avgAttraction / 100) + qualityBonus));
+
+                const hourlyVolume = baseTraffic * conversionRate * (1 + speedBonus);
+
+                // 24H Logic: Night traffic drops to 30%, but runs for 14 extra hours
+                const dayHours = 10;
+                const nightHours = state.is24h ? 14 : 0;
+                const weightedVolume = (hourlyVolume * dayHours) + (hourlyVolume * 0.3 * nightHours);
+                const avgVolumePerHour = weightedVolume / (dayHours + nightHours || 1); // For hourly profit display
+
+                const grossProfitDaily = weightedVolume * (avgPrice - avgCost);
+
+                const hourlyProfit = avgVolumePerHour * (avgPrice - avgCost);
+                const productionSpeed = 1 + speedBonus;
+
+                const rent = state.financials.rent;
+                const staffCost = state.staff.partTime * 35000 +
+                    state.staff.fullTime * 45000 +
+                    state.staff.manager * 60000;
+
+                // 24H requires 3 shifts (simplified 3x multiplier for staff cost if 24H)
+                const staffMultiplier = state.is24h ? 3 : 1;
+                const monthlyExpenses = rent + (staffCost * staffMultiplier);
+
+                const monthlyProjection = Math.round(grossProfitDaily * 30 - monthlyExpenses);
+
+                return { hourlyProfit, monthlyProjection, productionSpeed, monthlyExpenses, grossProfitDaily };
+            };
+
+            const [gameState, setGameState] = useState(() => {
+                const saved = localStorage.getItem('bobaKingState');
+                let parsed = INITIAL_STATE;
+
+                if (saved) {
+                    try {
+                        const savedObj = JSON.parse(saved);
+                        parsed = {
+                            ...INITIAL_STATE,
+                            ...savedObj,
+                            equipment: { ...INITIAL_STATE.equipment, ...savedObj.equipment },
+                            financials: { ...INITIAL_STATE.financials, ...savedObj.financials },
+                            competitors: savedObj.competitors || INITIAL_STATE.competitors
+                        };
+                    } catch (e) {
+                        console.error("Save error", e);
+                    }
+                }
+                return parsed;
+            });
+
+            // Initialize: Check for offline earnings and simulate competitors ONCE on mount
+            useEffect(() => {
+                // Offline Calculation
+                const lastTime = gameState.lastOnline;
+                const now = Date.now();
+                const offlineHours = (now - lastTime) / (1000 * 60 * 60);
+
+                if (offlineHours > 0.05) {
+                    const metrics = calculateFinance(gameState);
+                    // Use monthly projection to derive hourly net
+                    const dailyNet = metrics.monthlyProjection / 30;
+                    const hourlyNet = dailyNet / 24;
+
+                    // Logic: 
+                    // Revenue = (grossProfitDaily / 24) * hours
+                    // Expenses = (metrics.monthlyExpenses / (30 * 24)) * hours
+
+                    const revenue = (metrics.grossProfitDaily / 24) * offlineHours;
+                    const expenses = (metrics.monthlyExpenses / (30 * 24)) * offlineHours;
+                    const net = revenue - expenses;
+
+                    setOfflineReport({
+                        hours: offlineHours,
+                        revenue: Math.round(revenue),
+                        expenses: Math.round(expenses),
+                        net: Math.round(net)
+                    });
+
+                    setGameState(prev => ({
+                        ...prev,
+                        money: prev.money + Math.round(net),
+                        day: prev.day + Math.floor(offlineHours / 24)
+                    }));
+                }
+
+                // Simulate Competitors
+                setGameState(prev => {
+                    const newCompetitors = prev.competitors.map(c => {
+                        const fluctuation = 0.9 + Math.random() * 0.2; // 0.9 ~ 1.1
+                        return {
+                            ...c,
+                            monthlyRevenue: Math.round(c.monthlyRevenue * fluctuation)
+                        };
+                    }).sort((a, b) => b.monthlyRevenue - a.monthlyRevenue);
+
+                    return { ...prev, competitors: newCompetitors };
+                });
+
+            }, []); // Empty deps = run once on mount
+
+            // Auto-save
+            useEffect(() => {
+                const saveState = { ...gameState, lastOnline: Date.now() };
+                localStorage.setItem('bobaKingState', JSON.stringify(saveState));
+            }, [gameState]);
+
+            const handleServeDrink = (revenue, cost) => {
+                const profit = revenue - cost;
+                setGameState(prev => ({
+                    ...prev,
+                    money: prev.money + profit, // Cash tracks Profit
+                    monthlyEarnings: prev.monthlyEarnings + revenue, // Earnings tracks Revenue (Metric)
+                    metrics: {
+                        daily: (prev.metrics?.daily || 0) + revenue,
+                        monthly: (prev.metrics?.monthly || 0) + revenue,
+                        total: (prev.metrics?.total || 0) + revenue
+                    },
+                    reputation: prev.reputation + 1,
+                }));
+            };
+
+            const metrics = calculateFinance(gameState);
+
+            if (!gameState.hasStarted) {
+                return (
+                    <IntroScene
+                        onStart={(name) => {
+                            setGameState(prev => ({
+                                ...prev,
+                                shopName: name,
+                                hasStarted: true
+                            }));
+                        }}
+                    />
+                );
+            }
+
+            return (
+                <div className="w-full h-full bg-gradient-to-b from-dirtDark to-black relative">
+                    <GameHUD gameState={gameState} onMenuClick={() => setShowMenu(true)} />
+
+                    {currentScene === 'street' && <StreetScene gameState={gameState} />}
+                    {currentScene === 'store' && (
+                        <StoreScene
+                            gameState={gameState}
+                            onServeDrink={handleServeDrink}
+                            productionSpeed={metrics.productionSpeed}
+                        />
+                    )}
+                    {currentScene === 'manage' && (
+                        <ManageScene
+                            gameState={gameState}
+                            onUpdateGameState={setGameState}
+                            projection={metrics.monthlyProjection}
+                        />
+                    )}
+
+                    <NavigationBar currentScene={currentScene} onSceneChange={setCurrentScene} />
+
+                    {/* Offline Report */}
+                    {offlineReport && (
+                        <OfflineReport
+                            data={offlineReport}
+                            onClose={() => setOfflineReport(null)}
+                        />
+                    )}
+
+                    {/* Settings Menu Modal */}
+                    {showMenu && (
+                        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-8">
+                            <PixelPanel className="w-full max-w-sm p-6" variant="dirt">
+                                <h2 className="font-silkscreen text-gold text-2xl mb-6 text-center">
+                                    ⚙️ 選單
+                                </h2>
+                                <div className="space-y-3">
+                                    <PixelButton variant="secondary" className="w-full">
+                                        💾 儲存遊戲
+                                    </PixelButton>
+                                    <PixelButton
+                                        variant="danger"
+                                        className="w-full"
+                                        onClick={() => {
+                                            setShowMenu(false);
+                                            setShowResetConfirm(true);
+                                        }}
+                                    >
+                                        🔄 重新開始
+                                    </PixelButton>
+                                    <PixelButton
+                                        variant="gold"
+                                        className="w-full"
+                                        onClick={() => setShowMenu(false)}
+                                    >
+                                        ✕ 關閉
+                                    </PixelButton>
+                                </div>
+                            </PixelPanel>
+                        </div>
+                    )}
+
+                    {showResetConfirm && (
+                        <DialogModal
+                            title="重新開始"
+                            message="確定要刪除存檔並重新開始嗎？此動作無法復原。"
+                            confirmText="重置"
+                            variant="danger"
+                            onCancel={() => setShowResetConfirm(false)}
+                            onConfirm={() => {
+                                localStorage.removeItem('bobaKingState');
+                                setGameState(INITIAL_STATE);
+                                setShowResetConfirm(false);
+                            }}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // Mount the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
