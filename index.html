@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="手搖飲大王 - 在永吉路30巷開創你的飲料帝國！">
     <title>🧋 手搖飲大王</title>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-4TPNDC87W6');
+    </script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -143,6 +151,12 @@
         const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
         // ==================== CONSTANTS ====================
+        const GAME_TIME = {
+            REAL_HOURS_PER_GAME_DAY: 4,  // 4 real hours = 1 game day
+            BUSINESS_OPEN_HOUR: 11,      // 11 AM
+            BUSINESS_CLOSE_HOUR: 19,     // 7 PM
+        };
+
         const INGREDIENTS = {
             bases: [
                 { id: 'black-tea', name: '紅茶', cost: 5, attraction: 10, emoji: '🍵', trait: '上班族熱愛' },
@@ -178,6 +192,27 @@
         // ==================== UTILITY FUNCTIONS ====================
         const formatMoney = (amount) => {
             return `NT$${amount.toLocaleString()}`;
+        };
+
+        // Game Time Functions
+        const getGameTime = (gameStartTime) => {
+            const realElapsedMs = Date.now() - gameStartTime;
+            const realElapsedHours = realElapsedMs / (1000 * 60 * 60);
+            const gameElapsedHours = realElapsedHours * (24 / GAME_TIME.REAL_HOURS_PER_GAME_DAY);
+            const gameHour = gameElapsedHours % 24;
+            const gameDay = Math.floor(gameElapsedHours / 24) + 1;
+            return { gameHour, gameDay };
+        };
+
+        const isBusinessOpen = (gameHour, is24h) => {
+            if (is24h) return true;
+            return gameHour >= GAME_TIME.BUSINESS_OPEN_HOUR && gameHour < GAME_TIME.BUSINESS_CLOSE_HOUR;
+        };
+
+        const formatGameTime = (gameHour) => {
+            const hours = Math.floor(gameHour);
+            const minutes = Math.floor((gameHour % 1) * 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         };
 
         const calculateDrinkCost = (drink) => {
@@ -273,27 +308,38 @@
 
         // ==================== HUD COMPONENT ====================
         const GameHUD = ({ gameState, onMenuClick }) => {
+            const [currentTime, setCurrentTime] = useState(() => getGameTime(gameState.gameStartTime));
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setCurrentTime(getGameTime(gameState.gameStartTime));
+                }, 1000); // Update every second
+                return () => clearInterval(interval);
+            }, [gameState.gameStartTime]);
+
+            const businessOpen = isBusinessOpen(currentTime.gameHour, gameState.is24h);
+
             return (
                 <div className="absolute top-0 left-0 right-0 z-50 p-2">
                     <PixelPanel className="p-2" variant="dark">
                         <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1">
-                                    <span className="text-2xl">💰</span>
-                                    <span className="font-pixel text-gold text-xl">
+                                    <span className="text-xl">💰</span>
+                                    <span className="font-pixel text-gold text-lg">
                                         {formatMoney(gameState.money)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <span className="text-2xl">⭐</span>
-                                    <span className="font-pixel text-goldLight text-xl">
-                                        {gameState.reputation}
+                                    <span className="text-xl">🕐</span>
+                                    <span className={`font-pixel text-lg ${businessOpen ? 'text-grassLight' : 'text-red-400'}`}>
+                                        {formatGameTime(currentTime.gameHour)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <span className="text-2xl">📅</span>
-                                    <span className="font-pixel text-white text-xl">
-                                        Day {gameState.day}
+                                    <span className="text-xl">📅</span>
+                                    <span className="font-pixel text-white text-lg">
+                                        Day {currentTime.gameDay}
                                     </span>
                                 </div>
                             </div>
@@ -743,10 +789,10 @@
         };
 
         // ==================== STORE SCENE (First-Person POS) ====================
-        const StoreScene = ({ gameState, onServeDrink, productionSpeed = 1 }) => {
+        const StoreScene = ({ gameState, onServeDrink, productionSpeed = 1, onUpdateGameState }) => {
             const canvasRef = useRef(null);
-            const [localProfit, setLocalProfit] = useState(0);
             const [currentOrder, setCurrentOrder] = useState(null);
+            const [currentGameTime, setCurrentGameTime] = useState(() => getGameTime(gameState.gameStartTime));
 
             // State: 'waiting' | 'approach' | 'ordering' | 'serving' | 'leaving'
             const [customerState, setCustomerState] = useState('waiting');
@@ -763,6 +809,33 @@
 
             // Audio/Visual feedback placeholder
             const playDing = () => { };
+
+            // Check business hours and update game time
+            const businessOpen = isBusinessOpen(currentGameTime.gameHour, gameState.is24h);
+
+            // Update game time periodically
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    const newTime = getGameTime(gameState.gameStartTime);
+                    setCurrentGameTime(newTime);
+
+                    // Check for day change and reset today's stats
+                    if (newTime.gameDay !== gameState.lastGameDay && onUpdateGameState) {
+                        onUpdateGameState(prev => ({
+                            ...prev,
+                            lastGameDay: newTime.gameDay,
+                            day: newTime.gameDay,
+                            todayRevenue: 0,
+                            todayCustomers: 0,
+                            metrics: {
+                                ...prev.metrics,
+                                daily: 0
+                            }
+                        }));
+                    }
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [gameState.gameStartTime, gameState.lastGameDay, onUpdateGameState]);
 
             useEffect(() => {
                 if (gameState.menu.length === 0) return;
@@ -794,10 +867,14 @@
                         if (p.x < -50) p.x = limit;
                     });
 
+                    // Check if business is open (use closure variable)
+                    const gameTime = getGameTime(gameState.gameStartTime);
+                    const isOpen = isBusinessOpen(gameTime.gameHour, gameState.is24h);
+
                     // 1. Update Game Logic
                     if (customerState === 'waiting') {
-                        // Random chance to spawn customer
-                        if (Math.random() < 0.01 * productionSpeed) {
+                        // Only spawn customers during business hours
+                        if (isOpen && Math.random() < 0.01 * productionSpeed) {
                             customerData.current = {
                                 type: ['student', 'worker', 'hipster', 'tourist'][Math.floor(Math.random() * 4)],
                                 x: canvas.width / 2, // Center
@@ -834,7 +911,6 @@
                             const cost = calculateDrinkCost(drink);
                             const revenue = drink.price;
 
-                            setLocalProfit(p => p + revenue); // Display Revenue
                             onServeDrink(revenue, cost);
 
                             setCustomerState('leaving');
@@ -863,23 +939,25 @@
                     ctx.fillStyle = '#87CEEB'; // Sky
                     ctx.fillRect(0, 0, width, height);
 
-                    // Cityscape / Buildings
+                    // Cityscape / Buildings (Raised for mobile visibility)
+                    const horizonY = height * 0.35;  // Raise horizon line
                     ctx.fillStyle = '#dfe6e9';
-                    ctx.fillRect(50, height / 2 - 100, 100, 150); // Building 1
+                    ctx.fillRect(50, horizonY - 100, 100, 150); // Building 1
                     ctx.fillStyle = '#b2bec3';
-                    ctx.fillRect(200, height / 2 - 150, 120, 200); // Building 2
+                    ctx.fillRect(180, horizonY - 180, 140, 230); // Building 2 (taller)
                     ctx.fillStyle = '#fab1a0';
-                    ctx.fillRect(width - 150, height / 2 - 80, 80, 130); // Building 3
+                    ctx.fillRect(width - 160, horizonY - 120, 100, 170); // Building 3
+                    ctx.fillStyle = '#74b9ff';
+                    ctx.fillRect(width - 280, horizonY - 80, 80, 130); // Building 4 (new)
 
                     // Street Floor
                     ctx.fillStyle = '#7f8c8d'; // Street
-                    ctx.fillRect(0, height / 2 + 50, width, height / 2);
+                    ctx.fillRect(0, horizonY + 50, width, height - horizonY);
 
-                    // 2. Background Pedestrians (Walking sideways outside)
+                    // 2. Background Pedestrians (Walking sideways outside) - Raised and larger
                     bgPedestrians.current.forEach(p => {
-                        // Scale larger (1.8) to look closer
                         const facing = p.speed > 0 ? 'right' : 'left';
-                        drawPixelSprite(ctx, p.x, height / 2 + 100, 1.8, p.type, p.frame, facing);
+                        drawPixelSprite(ctx, p.x, horizonY + 100, 2.2, p.type, p.frame, facing);
                     });
 
                     // 3. Customer Sprite (BEHIND Counter)
@@ -930,7 +1008,7 @@
                     window.removeEventListener('resize', resizeCanvas);
                     cancelAnimationFrame(animationFrameId);
                 };
-            }, [gameState.menu, productionSpeed, customerState]); // Re-bind on state change logic
+            }, [gameState.menu, productionSpeed, customerState, gameState.gameStartTime, gameState.is24h]); // Re-bind on state change logic
 
             return (
                 <div className="scene-enter h-full flex flex-col p-4 pt-20 pb-28 overflow-hidden relative">
@@ -944,6 +1022,24 @@
                             ref={canvasRef}
                             className="w-full h-full object-cover"
                         />
+
+                        {/* Closed indicator */}
+                        {!businessOpen && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                <div className="text-center">
+                                    <div className="text-6xl mb-4">🌙</div>
+                                    <div className="font-pixel text-white text-2xl">休息中</div>
+                                    <div className="font-pixel text-stoneLight text-sm mt-2">
+                                        營業時間 11:00 - 19:00
+                                    </div>
+                                    {!gameState.is24h && (
+                                        <div className="font-pixel text-gold text-xs mt-4">
+                                            💡 開啟 24H 獲取夜間營收
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* POS Screen Overlay */}
                         <div className="absolute bottom-4 right-4 w-48 h-32 bg-stoneDark border-4 border-stone p-2 rounded shadow-xl opacity-90">
@@ -963,7 +1059,7 @@
                                     </>
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-stone text-center animate-pulse">
-                                        等待點單...<br />SYSTEM READY
+                                        {businessOpen ? '等待點單...' : '休息中...'}<br />SYSTEM READY
                                     </div>
                                 )}
                             </div>
@@ -975,13 +1071,13 @@
                         <div className="text-left">
                             <div className="font-pixel text-stoneLight text-sm">今日來客</div>
                             <div className="font-pixel text-white text-xl">
-                                {Math.floor(localProfit / 30)} 人
+                                {gameState.todayCustomers || 0} 人
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="font-pixel text-stoneLight text-sm">自動營收</div>
+                            <div className="font-pixel text-stoneLight text-sm">今日營收</div>
                             <div className="font-pixel text-gold text-2xl">
-                                {formatMoney(localProfit)}
+                                {formatMoney(gameState.todayRevenue || 0)}
                             </div>
                         </div>
                     </PixelPanel>
@@ -1469,6 +1565,10 @@
             money: 100000,
             reputation: 0,
             day: 1,
+            todayRevenue: 0, // Today's revenue for store display
+            todayCustomers: 0, // Today's customer count
+            gameStartTime: Date.now(), // Game start timestamp for time calculation
+            lastGameDay: 1, // Track last game day for daily reset
             metrics: { daily: 0, monthly: 0, total: 0 },
             menu: [
                 { id: 1, base: 'black-tea', toppings: ['boba'], price: 45, name: '珍珠紅茶' },
@@ -1756,7 +1856,8 @@
                 setGameState(prev => ({
                     ...prev,
                     money: prev.money + profit, // Cash tracks Profit
-                    monthlyEarnings: prev.monthlyEarnings + revenue, // Earnings tracks Revenue (Metric)
+                    todayRevenue: (prev.todayRevenue || 0) + revenue, // Today's revenue for store display
+                    todayCustomers: (prev.todayCustomers || 0) + 1, // Today's customer count
                     metrics: {
                         daily: (prev.metrics?.daily || 0) + revenue,
                         monthly: (prev.metrics?.monthly || 0) + revenue,
@@ -1792,6 +1893,7 @@
                             gameState={gameState}
                             onServeDrink={handleServeDrink}
                             productionSpeed={metrics.productionSpeed}
+                            onUpdateGameState={setGameState}
                         />
                     )}
                     {currentScene === 'manage' && (
