@@ -191,7 +191,7 @@
 
         // ==================== UTILITY FUNCTIONS ====================
         const formatMoney = (amount) => {
-            return `NT$${amount.toLocaleString()}`;
+            return `NT$${Math.round(amount || 0).toLocaleString()}`;
         };
 
         // Game Time Functions
@@ -617,15 +617,18 @@
                 };
                 const onMove = (e) => {
                     if (!isDragging.current) return;
-                    e.preventDefault(); // Prevent page scroll
+                    e.preventDefault();
                     const cx = e.touches ? e.touches[0].clientX : e.clientX;
                     const dx = cx - lastX.current;
                     scrollX.current += dx;
                     lastX.current = cx;
 
-                    // Boundaries (Simple)
+                    // Constrained Boundaries based on content
+                    const shopWidth = 140;
+                    const gap = 20;
+                    const totalContentWidth = 100 + (shops.length * shopWidth) + ((shops.length - 1) * gap);
                     const maxScroll = 0;
-                    const minScroll = -(shops.length * 160); // approx width
+                    const minScroll = Math.min(0, canvas.width - totalContentWidth - 100); // 100px buffer for right side
                     if (scrollX.current > maxScroll) scrollX.current = maxScroll;
                     if (scrollX.current < minScroll) scrollX.current = minScroll;
                 };
@@ -676,78 +679,123 @@
                 const render = () => {
                     const width = canvas.width;
                     const height = canvas.height;
+                    const sx = scrollX.current;
 
-                    // Sky
+                    // 1. Sky (Layer 0 - Static)
                     ctx.fillStyle = '#87CEEB';
                     ctx.fillRect(0, 0, width, height);
 
-                    // Ground
-                    ctx.fillStyle = '#95a5a6'; // Concrete sidewalk
+                    // 2. Far Background (Layer 1 - 0.05x scroll)
+                    // Sun & Glow
+                    const sunX = width * 0.8 + (sx * 0.05);
+                    const sunY = 100;
+                    ctx.fillStyle = '#f9ca24';
+                    ctx.beginPath(); ctx.arc(sunX, sunY, 40, 0, Math.PI * 2); ctx.fill();
+                    const glow = ctx.createRadialGradient(sunX, sunY, 40, sunX, sunY, 80);
+                    glow.addColorStop(0, 'rgba(249, 202, 36, 0.3)');
+                    glow.addColorStop(1, 'rgba(249, 202, 36, 0)');
+                    ctx.fillStyle = glow; ctx.fillRect(sunX - 100, sunY - 100, 200, 200);
+
+                    // 3. Clouds (Layer 2 - 0.1x scroll)
+                    const cloudScroll = sx * 0.1;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    const drawCloud = (cx, cy, scale) => {
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 20 * scale, 0, Math.PI * 2);
+                        ctx.moveTo(cx + 40 * scale, cy - 10 * scale); // Position pen for next circle
+                        ctx.arc(cx + 25 * scale, cy - 10 * scale, 15 * scale, 0, Math.PI * 2);
+                        ctx.moveTo(cx + 40 * scale, cy + 10 * scale);
+                        ctx.arc(cx + 25 * scale, cy + 10 * scale, 15 * scale, 0, Math.PI * 2);
+                        ctx.moveTo(cx + 70 * scale, cy);
+                        ctx.arc(cx + 50 * scale, cy, 20 * scale, 0, Math.PI * 2);
+                        ctx.fill();
+                    };
+                    drawCloud(100 + cloudScroll, 150, 1.5);
+                    drawCloud(500 + cloudScroll, 80, 1.2);
+                    drawCloud(1000 + cloudScroll, 180, 1.0);
+                    drawCloud(1400 + cloudScroll, 100, 1.3);
+
+                    // 4. Cityscape (Layer 3 - 0.2x scroll)
+                    const cityScroll = sx * 0.2;
+                    ctx.fillStyle = '#b2bec3';
+                    for (let i = 0; i < 15; i++) {
+                        const bWidth = 60 + (i % 4) * 20;
+                        const bHeight = 100 + (i * 71 % 150);
+                        const bx = i * 200 + cityScroll - 300;
+                        ctx.fillRect(bx, height - 300 - bHeight, bWidth, bHeight);
+                        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                        ctx.fillRect(bx + 10, height - 300 - bHeight + 10, bWidth - 20, bHeight - 20);
+                        ctx.fillStyle = '#b2bec3';
+                    }
+
+                    // 5. Landmarks (Layer 4 - 0.4x scroll)
+                    const landmarkScroll = sx * 0.4;
+                    // Taipei 101
+                    const t101X = width * 0.7 + landmarkScroll;
+                    const t101BaseY = height - 300;
+                    ctx.save();
+                    ctx.fillStyle = '#54a0ff';
+                    ctx.fillRect(t101X, t101BaseY - 450, 60, 450);
+                    for (let i = 0; i < 8; i++) {
+                        const sy = t101BaseY - 80 - (i * 45);
+                        ctx.beginPath();
+                        ctx.moveTo(t101X - 15, sy); ctx.lineTo(t101X + 75, sy);
+                        ctx.lineTo(t101X + 65, sy - 35); ctx.lineTo(t101X - 5, sy - 35);
+                        ctx.fill();
+                        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                        ctx.strokeRect(t101X + 5, sy - 30, 50, 25);
+                    }
+                    ctx.fillStyle = '#2e86de';
+                    ctx.fillRect(t101X + 25, t101BaseY - 500, 10, 50);
+                    ctx.fillRect(t101X + 29, t101BaseY - 560, 2, 60);
+
+                    // Breeze
+                    const breezeX = width * 0.1 + landmarkScroll;
+                    const breezeBaseY = height - 300;
+                    ctx.fillStyle = '#00d2d3';
+                    ctx.beginPath();
+                    ctx.moveTo(breezeX, breezeBaseY); ctx.lineTo(breezeX, breezeBaseY - 260);
+                    ctx.quadraticCurveTo(breezeX + 40, breezeBaseY - 300, breezeX + 80, breezeBaseY - 240);
+                    ctx.lineTo(breezeX + 80, breezeBaseY); ctx.fill();
+                    ctx.restore();
+
+                    // 6. Ground & World (Layer 5 - 1.0x scroll)
+                    // Ground (Fixed Backdrop)
+                    ctx.fillStyle = '#95a5a6';
                     ctx.fillRect(0, height - 300, width, 300);
 
                     ctx.save();
-                    // Apply Scroll only to World
+                    ctx.translate(sx, 0);
 
-                    // --- Draw Shops ---
-                    let startX = 50 + scrollX.current;
-                    const shopY = height - 450; // Lifted up more
+                    // Shops
+                    let currentStartX = 50;
+                    const shopY = height - 450;
                     const shopH = 150;
                     const shopWidth = 140;
                     const gap = 20;
 
                     shops.forEach((shop) => {
-                        drawShopStorefront(ctx, startX, shopY, shopWidth, shopH, 'tea', shop.name, shop.color);
-
-                        // "You are Here" marker
+                        drawShopStorefront(ctx, currentStartX, shopY, shopWidth, shopH, 'tea', shop.name, shop.color);
                         if (shop.isPlayer) {
-                            ctx.fillStyle = '#ffeaa7';
-                            ctx.font = '24px serif';
-                            ctx.textAlign = 'center';
-                            ctx.fillText('👇', startX + shopWidth / 2, shopY - 10);
+                            ctx.fillStyle = '#ffeaa7'; ctx.font = '24px serif'; ctx.textAlign = 'center';
+                            ctx.fillText('👇', currentStartX + shopWidth / 2, shopY - 10);
                         }
-
-                        startX += shopWidth + gap;
+                        currentStartX += shopWidth + gap;
                     });
 
-                    // --- Draw Pedestrians (Sorted by depth) ---
-                    // Sort by depth (far first, close last)
+                    // Pedestrians
                     const sortedPedestrians = [...pedestrians].sort((a, b) => a.depth - b.depth);
-
                     sortedPedestrians.forEach(p => {
-                        p.x += p.speed;
-                        p.frame++;
-
-                        // Wrap around
-                        const limit = 2000; // Wider world
-                        if (p.x > limit) p.x = -50;
-                        if (p.x < -50) p.x = limit;
-
+                        p.x += p.speed; p.frame++;
+                        const limit = 3000;
+                        if (p.x > limit) p.x = -50; if (p.x < -50) p.x = limit;
                         const facing = p.speed > 0 ? 'right' : 'left';
-
-                        // Calculate Depth Effects
-                        // Y position: height - 290 (far) to height - 210 (close) relative to new ground
-                        const y = (height - 290) + (p.depth * 80);
-
-                        // Scale: 2.5 (far) to 3.5 (close)
+                        const py = (height - 290) + (p.depth * 80);
                         const scale = 2.5 + (p.depth * 1.5);
-
-                        // Apply scroll to pedestrians too
-                        const drawX = p.x + scrollX.current;
-
-                        // Only draw if on screen
-                        if (drawX > -50 && drawX < width + 50) {
-                            // Shadow (optional depth cue)
-                            ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                            ctx.beginPath();
-                            ctx.ellipse(drawX, y, 6 * scale, 2 * scale, 0, 0, Math.PI * 2);
-                            ctx.fill();
-
-                            drawPixelSprite(ctx, drawX, y, scale, p.type, p.frame, facing);
-                        }
+                        drawPixelSprite(ctx, p.x, py, scale, p.type, p.frame, facing);
                     });
 
                     ctx.restore();
-
                     animationFrameId = requestAnimationFrame(render);
                 };
                 render();
@@ -789,7 +837,7 @@
         };
 
         // ==================== STORE SCENE (First-Person POS) ====================
-        const StoreScene = ({ gameState, onServeDrink, productionSpeed = 1, onUpdateGameState }) => {
+        const StoreScene = ({ gameState, onServeDrink, productionSpeed = 1, onUpdateGameState, orderNumber }) => {
             const canvasRef = useRef(null);
             const [currentOrder, setCurrentOrder] = useState(null);
             const [currentGameTime, setCurrentGameTime] = useState(() => getGameTime(gameState.gameStartTime));
@@ -819,19 +867,23 @@
                     const newTime = getGameTime(gameState.gameStartTime);
                     setCurrentGameTime(newTime);
 
-                    // Check for day change and reset today's stats
+                    // Check for day change and reset stats
                     if (newTime.gameDay !== gameState.lastGameDay && onUpdateGameState) {
-                        onUpdateGameState(prev => ({
-                            ...prev,
-                            lastGameDay: newTime.gameDay,
-                            day: newTime.gameDay,
-                            todayRevenue: 0,
-                            todayCustomers: 0,
-                            metrics: {
-                                ...prev.metrics,
-                                daily: 0
-                            }
-                        }));
+                        onUpdateGameState(prev => {
+                            const isNewMonth = (newTime.gameDay - 1) % 30 === 0 && newTime.gameDay > 1;
+                            return {
+                                ...prev,
+                                lastGameDay: newTime.gameDay,
+                                day: newTime.gameDay,
+                                todayRevenue: 0,
+                                todayCustomers: 0,
+                                metrics: {
+                                    ...prev.metrics,
+                                    daily: 0,
+                                    monthly: isNewMonth ? 0 : prev.metrics.monthly
+                                }
+                            };
+                        });
                     }
                 }, 1000);
                 return () => clearInterval(interval);
@@ -1046,7 +1098,7 @@
                             <div className="bg-black w-full h-full p-2 font-pixel text-left flex flex-col justify-between">
                                 {currentOrder ? (
                                     <>
-                                        <div className="text-grassLight text-sm">ORDER_ID: #{Math.floor(Math.random() * 999)}</div>
+                                        <div className="text-grassLight text-sm">ORDER_ID: #{String(orderNumber).padStart(3, '0')}</div>
                                         <div>
                                             <div className="text-white text-lg leading-tight">{currentOrder.name}</div>
                                             <div className="text-stoneLight text-xs mt-1">
@@ -1086,19 +1138,14 @@
         };
 
         // ==================== MANAGE SCENE ====================
-        const ManageScene = ({ gameState, onUpdateGameState, projection }) => {
+        const ManageScene = ({ gameState, onUpdateGameState, projection, metrics }) => {
             const [activeTab, setActiveTab] = useState('menu');
             const [editingDrink, setEditingDrink] = useState(null); // null = list view, object = editing
             const [drinkToDelete, setDrinkToDelete] = useState(null);
             const [rankPeriod, setRankPeriod] = useState('monthly'); // daily, monthly, total
 
-            const tabs = [
-                { id: 'menu', label: '菜單', icon: '📜' },
-                { id: 'equipment', label: '設備', icon: '⚙️' },
-                { id: 'staff', label: '人事', icon: '👥' },
-                { id: 'finance', label: '財務', icon: '💹' },
-                { id: 'rank', label: '排行', icon: '🏆' },
-            ];
+
+            // --- Settings & Tabs ---
 
             // --- Menu Editor Components ---
             const MenuEditor = ({ drink, onSave, onCancel }) => {
@@ -1301,6 +1348,16 @@
                 </div>
             );
 
+
+
+            const tabs = [
+                { id: 'menu', label: '菜單', icon: '🍹' },
+                { id: 'equipment', label: '設備', icon: '⚙️' },
+                { id: 'staff', label: '人事', icon: '👥' },
+                { id: 'finance', label: '財務', icon: '💹' },
+                { id: 'rank', label: '排行', icon: '🏆' },
+            ];
+
             return (
                 <div className="scene-enter h-full flex flex-col p-4 pt-20 pb-28">
                     {!editingDrink && (
@@ -1422,7 +1479,34 @@
                                         </button>
                                     </div>
                                     <p className="font-pixel text-stoneLight text-sm">
-                                        開啟後將進行三班制輪替，人力成本 x3，但可獲得夜間營收。
+                                        開啟後需應對三班制排班。理想配置：每班 1 正職 + 1 兼職。
+                                        {gameState.is24h && (
+                                            <div className="mt-2 space-y-1 bg-black/30 p-2 border border-stoneDark">
+                                                <div className="flex justify-between">
+                                                    <span>排班覆蓋率:</span>
+                                                    <span className={metrics.efficiencyBreakdown.coverage < 1 ? 'text-red-400' : 'text-grassLight'}>
+                                                        {Math.round(metrics.efficiencyBreakdown.coverage * 100)}%
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>管理效益:</span>
+                                                    <span className={metrics.efficiencyBreakdown.manager < 1 ? 'text-red-400' : 'text-grassLight'}>
+                                                        x{metrics.efficiencyBreakdown.manager.toFixed(1)}
+                                                    </span>
+                                                </div>
+                                                {metrics.efficiencyBreakdown.overcrowding > 0 && (
+                                                    <div className="flex justify-between text-red-400">
+                                                        <span>擁擠懲罰:</span>
+                                                        <span>-{Math.round(metrics.efficiencyBreakdown.overcrowding * 100)}%</span>
+                                                    </div>
+                                                )}
+                                                <div className="border-t border-stoneDark my-1"></div>
+                                                <div className="flex justify-between font-bold text-white">
+                                                    <span>最終效率:</span>
+                                                    <span>{Math.round(metrics.efficiencyBreakdown.total * 100)}%</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </p>
                                 </div>
 
@@ -1435,39 +1519,61 @@
                         {!editingDrink && activeTab === 'finance' && (
                             <div>
                                 <h3 className="font-pixel text-gold text-xl mb-4">💹 財務報表</h3>
-                                <div className="space-y-3">
+                                <div className="space-y-3 px-1">
                                     <div className="bg-dirtDark p-3 border-2 border-stoneDark">
                                         <div className="font-pixel text-stone">現金資產</div>
                                         <div className="font-pixel text-gold text-2xl">
                                             {formatMoney(gameState.money)}
                                         </div>
                                     </div>
+
                                     <div className="bg-dirtDark p-3 border-2 border-stoneDark">
-                                        <div className="font-pixel text-stone">本月預估淨利</div>
-                                        <div className={`font-pixel text-2xl ${projection >= 0 ? 'text-grassLight' : 'text-red-400'}`}>
-                                            {formatMoney(projection)}
-                                        </div>
-                                        <div className="font-pixel text-stoneLight text-sm mt-1">
-                                            (基於當前人流與菜單配置)
+                                        <div className="font-pixel text-white mb-2 border-b border-stoneDark pb-1">本月營運分析 (預估)</div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between font-pixel">
+                                                <span className="text-stone">總營收</span>
+                                                <span className="text-grassLight">{formatMoney(metrics.details.revenue)}</span>
+                                            </div>
+
+                                            <div className="flex justify-between font-pixel">
+                                                <span className="text-stone">原物料成本 (COGS)</span>
+                                                <span className="text-red-300">-{formatMoney(metrics.details.cogs)}</span>
+                                            </div>
+
+                                            <div className="border-t border-dashed border-stoneDark my-1"></div>
+
+                                            <div className="flex justify-between font-pixel text-sm">
+                                                <span className="text-stoneLight">店底租金</span>
+                                                <span className="text-red-400">-{formatMoney(metrics.details.rent)}</span>
+                                            </div>
+
+                                            <div className="flex justify-between font-pixel text-sm">
+                                                <span className="text-stoneLight">人力薪資</span>
+                                                <span className="text-red-400">-{formatMoney(metrics.details.staff)}</span>
+                                            </div>
+
+                                            <div className="flex justify-between font-pixel text-sm">
+                                                <span className="text-stoneLight">水電雜費 ({gameState.is24h ? '24H' : '標準'})</span>
+                                                <span className="text-red-400">-{formatMoney(metrics.details.utilities)}</span>
+                                            </div>
+
+                                            <div className="flex justify-between font-pixel text-sm">
+                                                <span className="text-stoneLight">設備維護費</span>
+                                                <span className="text-red-400">-{formatMoney(metrics.details.maintenance)}</span>
+                                            </div>
+
+                                            <div className="border-t-2 border-stoneDark pt-2 mt-2 flex justify-between font-pixel text-lg">
+                                                <span className="text-white">本月預計淨利</span>
+                                                <span className={projection >= 0 ? 'text-gold' : 'text-red-500'}>
+                                                    {formatMoney(projection)}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="border-t-2 border-dashed border-stone my-4"></div>
-                                    <div className="bg-dirtDark p-3 border-2 border-stoneDark">
-                                        <div className="font-pixel text-white mb-2">支出細項 (月)</div>
-                                        <div className="flex justify-between font-pixel text-stoneLight text-sm">
-                                            <span>店面租金</span>
-                                            <span className="text-red-300">-${formatMoney(gameState.financials.rent)}</span>
-                                        </div>
-                                        <div className="flex justify-between font-pixel text-stoneLight text-sm">
-                                            <span>人力成本 {gameState.is24h && '(x3)'}</span>
-                                            <span className="text-red-300">
-                                                -${formatMoney(
-                                                    (gameState.staff.partTime * 35000 +
-                                                        gameState.staff.fullTime * 45000 +
-                                                        gameState.staff.manager * 60000) * (gameState.is24h ? 3 : 1)
-                                                )}
-                                            </span>
-                                        </div>
+
+                                    <div className="text-center font-pixel text-stone text-xs italic">
+                                        * 數據隨銷量與營運配置即時變動
                                     </div>
                                 </div>
                             </div>
@@ -1564,11 +1670,12 @@
             hasStarted: false, // Onboarding flag
             money: 100000,
             reputation: 0,
-            day: 1,
             todayRevenue: 0, // Today's revenue for store display
             todayCustomers: 0, // Today's customer count
             gameStartTime: Date.now(), // Game start timestamp for time calculation
             lastGameDay: 1, // Track last game day for daily reset
+            lastGameMonth: 1, // Track last game month for daily reset
+            lastOrderNumber: 0, // Sequential order ID for POS
             metrics: { daily: 0, monthly: 0, total: 0 },
             menu: [
                 { id: 1, base: 'black-tea', toppings: ['boba'], price: 45, name: '珍珠紅茶' },
@@ -1733,7 +1840,20 @@
 
             // Helper: Calculate standard finance metrics from state
             const calculateFinance = (state) => {
-                if (state.menu.length === 0) return { hourlyProfit: 0, monthlyProjection: -state.financials.rent, productionSpeed: 1 };
+                const emptyBreakdown = { total: 1, coverage: 1, manager: 1, overcrowding: 0 };
+                const emptyDetails = { revenue: 0, cogs: 0, rent: state.financials.rent, staff: 0, utilities: 0, maintenance: 0 };
+
+                if (state.menu.length === 0) {
+                    return {
+                        hourlyProfit: 0,
+                        monthlyProjection: -state.financials.rent,
+                        productionSpeed: 1,
+                        grossRevenueMonthly: 0,
+                        monthlyExpenses: state.financials.rent,
+                        details: emptyDetails,
+                        efficiencyBreakdown: emptyBreakdown
+                    };
+                }
 
                 const avgPrice = state.menu.reduce((sum, d) => sum + d.price, 0) / state.menu.length;
                 const avgCost = state.menu.reduce((sum, d) => sum + calculateDrinkCost(d), 0) / state.menu.length;
@@ -1744,34 +1864,100 @@
                 const qualityBonus = state.equipment.iceMachine * 0.1;
                 const marketingBonus = state.equipment.marketing * 0.05;
 
+                // --- ADVANCED STAFFING LOGIC ---
+                const ft = state.staff.fullTime || 0;
+                const pt = state.staff.partTime || 0;
+                const mgr = state.staff.manager || 0;
+                const workers = ft + pt;
+                const totalStaff = workers + mgr;
+
+                const shiftsNeeded = state.is24h ? 3 : 1;
+                const idealFT = shiftsNeeded * 1;
+                const idealPT = shiftsNeeded * 1;
+
+                // 1. Coverage Efficiency (How well are shifts covered?)
+                const ftCoverage = Math.min(1, ft / idealFT);
+                const ptCoverage = Math.min(1, pt / idealPT);
+                const baseCoverage = (ftCoverage * 0.6 + ptCoverage * 0.4); // FT is more critical
+
+                // 2. Manager Impact (Coordination)
+                let managerImpact = 1.0;
+                if (workers > 2 && mgr === 0) {
+                    managerImpact = 0.8; // Penalty for no manager
+                } else if (mgr > 0) {
+                    managerImpact = 1.1; // Bonus for having a manager
+                }
+
+                // 3. Overcrowding Penalty (Space)
+                const capacity = 8;
+                let overcrowdingPenalty = 0;
+                if (totalStaff > capacity) {
+                    overcrowdingPenalty = (totalStaff - capacity) * 0.15;
+                }
+
+                // Final Efficiency Factor
+                const efficiencyFactor = Math.max(0.1, (baseCoverage * managerImpact) - overcrowdingPenalty);
+                const productionSpeed = (1 + speedBonus) * efficiencyFactor;
+                // ------------------------------
+
                 const baseTraffic = 100 * (1 + (state.reputation / 1000)) * (1 + marketingBonus);
                 const conversionRate = Math.min(0.8, (0.3 + (avgAttraction / 100) + qualityBonus));
 
-                const hourlyVolume = baseTraffic * conversionRate * (1 + speedBonus);
+                // Efficiency affects volume (can't serve everyone if staff is low)
+                const hourlyVolume = baseTraffic * conversionRate * (1 + speedBonus) * efficiencyFactor;
 
                 // 24H Logic: Night traffic drops to 30%, but runs for 14 extra hours
                 const dayHours = 10;
                 const nightHours = state.is24h ? 14 : 0;
                 const weightedVolume = (hourlyVolume * dayHours) + (hourlyVolume * 0.3 * nightHours);
-                const avgVolumePerHour = weightedVolume / (dayHours + nightHours || 1); // For hourly profit display
+                const avgVolumePerHour = weightedVolume / (dayHours + nightHours || 1);
 
-                const grossProfitDaily = weightedVolume * (avgPrice - avgCost);
+                const monthlyVolume = weightedVolume * 30; // 30 days projection
 
-                const hourlyProfit = avgVolumePerHour * (avgPrice - avgCost);
-                const productionSpeed = 1 + speedBonus;
+                // --- DETAILED COSTS ---
+                // 1. Ingredients (COGS)
+                const monthlyCOGS = Math.round(monthlyVolume * avgCost);
 
+                // 2. Utilities (水電)
+                let utilitiesBase = 2000;
+                if (state.is24h) utilitiesBase += 1500;
+                const utilitiesVariable = monthlyVolume * 1.0; // $1 per drink
+                const monthlyUtilities = Math.round(utilitiesBase + utilitiesVariable);
+
+                // 3. Maintenance (設備維修)
+                const equipmentLvSum = Object.values(state.equipment).reduce((a, b) => a + b, 0);
+                const monthlyMaintenance = equipmentLvSum * 500;
+
+                // 4. Existing Fixed Costs
                 const rent = state.financials.rent;
-                const staffCost = state.staff.partTime * 35000 +
-                    state.staff.fullTime * 45000 +
-                    state.staff.manager * 60000;
+                const staffCost = Math.round((pt * 35000) + (ft * 45000) + (mgr * 60000));
+                // ----------------------
 
-                // 24H requires 3 shifts (simplified 3x multiplier for staff cost if 24H)
-                const staffMultiplier = state.is24h ? 3 : 1;
-                const monthlyExpenses = rent + (staffCost * staffMultiplier);
+                const grossRevenueMonthly = Math.round(monthlyVolume * avgPrice);
+                const monthlyExpenses = Math.round(rent + staffCost + monthlyCOGS + monthlyUtilities + monthlyMaintenance);
+                const monthlyProjection = grossRevenueMonthly - monthlyExpenses;
 
-                const monthlyProjection = Math.round(grossProfitDaily * 30 - monthlyExpenses);
-
-                return { hourlyProfit, monthlyProjection, productionSpeed, monthlyExpenses, grossProfitDaily };
+                return {
+                    hourlyProfit: Math.round(avgVolumePerHour * (avgPrice - avgCost)),
+                    monthlyProjection,
+                    productionSpeed,
+                    monthlyExpenses,
+                    grossRevenueMonthly,
+                    details: {
+                        revenue: grossRevenueMonthly,
+                        cogs: monthlyCOGS,
+                        rent: rent,
+                        staff: staffCost,
+                        utilities: monthlyUtilities,
+                        maintenance: monthlyMaintenance
+                    },
+                    efficiencyBreakdown: {
+                        total: efficiencyFactor,
+                        coverage: baseCoverage,
+                        manager: managerImpact,
+                        overcrowding: overcrowdingPenalty
+                    }
+                };
             };
 
             const [gameState, setGameState] = useState(() => {
@@ -1797,50 +1983,71 @@
 
             // Initialize: Check for offline earnings and simulate competitors ONCE on mount
             useEffect(() => {
-                // Offline Calculation
-                const lastTime = gameState.lastOnline;
                 const now = Date.now();
+                const { gameDay, gameHour } = getGameTime(gameState.gameStartTime);
+                const gameMonth = Math.floor((gameDay - 1) / 30) + 1;
+
+                // 1. Metric Reset Check (Day/Month)
+                let updatedMetrics = { ...gameState.metrics };
+                let dayChanged = gameDay > (gameState.lastGameDay || 0);
+                let monthChanged = gameMonth > (gameState.lastGameMonth || 0);
+
+                if (dayChanged) {
+                    updatedMetrics.daily = 0;
+                }
+                if (monthChanged) {
+                    updatedMetrics.monthly = 0;
+                }
+
+                // 2. Offline Calculation
+                const lastTime = gameState.lastOnline;
                 const offlineHours = (now - lastTime) / (1000 * 60 * 60);
+                let offlineNet = 0;
+                let offlineRevenue = 0;
 
                 if (offlineHours > 0.05) {
-                    const metrics = calculateFinance(gameState);
-                    // Use monthly projection to derive hourly net
-                    const dailyNet = metrics.monthlyProjection / 30;
-                    const hourlyNet = dailyNet / 24;
+                    const finance = calculateFinance(gameState);
+                    // Conversion: monthlyRevenue / (30 days * 24 hours)
+                    const hourlyRevenue = finance.grossRevenueMonthly / (30 * 24);
+                    const hourlyExpenses = finance.monthlyExpenses / (30 * 24);
 
-                    // Logic: 
-                    // Revenue = (grossProfitDaily / 24) * hours
-                    // Expenses = (metrics.monthlyExpenses / (30 * 24)) * hours
-
-                    const revenue = (metrics.grossProfitDaily / 24) * offlineHours;
-                    const expenses = (metrics.monthlyExpenses / (30 * 24)) * offlineHours;
-                    const net = revenue - expenses;
+                    const offlineExpenses = hourlyExpenses * offlineHours;
+                    offlineRevenue = hourlyRevenue * offlineHours;
+                    offlineNet = offlineRevenue - offlineExpenses;
 
                     setOfflineReport({
                         hours: offlineHours,
-                        revenue: Math.round(revenue),
-                        expenses: Math.round(expenses),
-                        net: Math.round(net)
+                        revenue: Math.round(offlineRevenue),
+                        expenses: Math.round(offlineExpenses),
+                        net: Math.round(offlineNet)
                     });
 
-                    setGameState(prev => ({
-                        ...prev,
-                        money: prev.money + Math.round(net),
-                        day: prev.day + Math.floor(offlineHours / 24)
-                    }));
+                    // Add offline revenue to metrics
+                    updatedMetrics.daily += offlineRevenue;
+                    updatedMetrics.monthly += offlineRevenue;
+                    updatedMetrics.total += offlineRevenue;
                 }
 
-                // Simulate Competitors
+                // 3. Update Game State once on mount
                 setGameState(prev => {
-                    const newCompetitors = prev.competitors.map(c => {
-                        const fluctuation = 0.9 + Math.random() * 0.2; // 0.9 ~ 1.1
-                        return {
+                    // 4. Simulate Competitors (Only on day change or if new session)
+                    const shouldFluctuate = dayChanged || !prev.lastOnline;
+                    const newCompetitors = shouldFluctuate
+                        ? prev.competitors.map(c => ({
                             ...c,
-                            monthlyRevenue: Math.round(c.monthlyRevenue * fluctuation)
-                        };
-                    }).sort((a, b) => b.monthlyRevenue - a.monthlyRevenue);
+                            monthlyRevenue: Math.round(c.monthlyRevenue * (0.95 + Math.random() * 0.1)) // 0.95 ~ 1.05
+                        })).sort((a, b) => b.monthlyRevenue - a.monthlyRevenue)
+                        : prev.competitors;
 
-                    return { ...prev, competitors: newCompetitors };
+                    return {
+                        ...prev,
+                        money: prev.money + Math.round(offlineNet),
+                        lastGameDay: gameDay,
+                        lastGameMonth: gameMonth,
+                        lastOrderNumber: dayChanged ? 0 : (prev.lastOrderNumber || 0),
+                        metrics: updatedMetrics,
+                        competitors: newCompetitors
+                    };
                 });
 
             }, []); // Empty deps = run once on mount
@@ -1853,18 +2060,22 @@
 
             const handleServeDrink = (revenue, cost) => {
                 const profit = revenue - cost;
-                setGameState(prev => ({
-                    ...prev,
-                    money: prev.money + profit, // Cash tracks Profit
-                    todayRevenue: (prev.todayRevenue || 0) + revenue, // Today's revenue for store display
-                    todayCustomers: (prev.todayCustomers || 0) + 1, // Today's customer count
-                    metrics: {
-                        daily: (prev.metrics?.daily || 0) + revenue,
-                        monthly: (prev.metrics?.monthly || 0) + revenue,
-                        total: (prev.metrics?.total || 0) + revenue
-                    },
-                    reputation: prev.reputation + 1,
-                }));
+                setGameState(prev => {
+                    const nextOrder = (prev.lastOrderNumber || 0) + 1;
+                    return {
+                        ...prev,
+                        money: prev.money + profit, // Cash tracks Profit
+                        todayRevenue: (prev.todayRevenue || 0) + revenue, // Today's revenue for store display
+                        todayCustomers: (prev.todayCustomers || 0) + 1, // Today's customer count
+                        lastOrderNumber: nextOrder > 999 ? 1 : nextOrder, // 3-digit wrapping logic
+                        metrics: {
+                            daily: (prev.metrics?.daily || 0) + revenue,
+                            monthly: (prev.metrics?.monthly || 0) + revenue,
+                            total: (prev.metrics?.total || 0) + revenue
+                        },
+                        reputation: prev.reputation + 1,
+                    };
+                });
             };
 
             const metrics = calculateFinance(gameState);
@@ -1894,6 +2105,7 @@
                             onServeDrink={handleServeDrink}
                             productionSpeed={metrics.productionSpeed}
                             onUpdateGameState={setGameState}
+                            orderNumber={(gameState.lastOrderNumber || 0) + 1}
                         />
                     )}
                     {currentScene === 'manage' && (
@@ -1901,6 +2113,7 @@
                             gameState={gameState}
                             onUpdateGameState={setGameState}
                             projection={metrics.monthlyProjection}
+                            metrics={metrics}
                         />
                     )}
 
@@ -1940,8 +2153,23 @@
                                         className="w-full"
                                         onClick={() => setShowMenu(false)}
                                     >
-                                        ✕ 關閉
+                                        ✕ 取消
                                     </PixelButton>
+                                </div>
+                                <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
+                                    <div className="flex flex-col items-center gap-1">
+                                        <div className="text-[10px] font-silkscreen text-stoneLight uppercase tracking-widest opacity-40">
+                                            Bubble Tea Tycoon v1.0.0
+                                        </div>
+                                        <a
+                                            href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=cokefever@gmail.com&item_name=Support+Bubble+Tea+Tycoon&no_shipping=1&tax=0&currency_code=USD&amount=0.99"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs font-pixel text-gold hover:text-white transition-colors flex items-center gap-1"
+                                        >
+                                            💖 請我喝杯手搖飲 🍵
+                                        </a>
+                                    </div>
                                 </div>
                             </PixelPanel>
                         </div>
