@@ -864,30 +864,10 @@
             // Update game time periodically
             useEffect(() => {
                 const interval = setInterval(() => {
-                    const newTime = getGameTime(gameState.gameStartTime);
-                    setCurrentGameTime(newTime);
-
-                    // Check for day change and reset stats
-                    if (newTime.gameDay !== gameState.lastGameDay && onUpdateGameState) {
-                        onUpdateGameState(prev => {
-                            const isNewMonth = (newTime.gameDay - 1) % 30 === 0 && newTime.gameDay > 1;
-                            return {
-                                ...prev,
-                                lastGameDay: newTime.gameDay,
-                                day: newTime.gameDay,
-                                todayRevenue: 0,
-                                todayCustomers: 0,
-                                metrics: {
-                                    ...prev.metrics,
-                                    daily: 0,
-                                    monthly: isNewMonth ? 0 : prev.metrics.monthly
-                                }
-                            };
-                        });
-                    }
+                    setCurrentGameTime(getGameTime(gameState.gameStartTime));
                 }, 1000);
                 return () => clearInterval(interval);
-            }, [gameState.gameStartTime, gameState.lastGameDay, onUpdateGameState]);
+            }, [gameState.gameStartTime]);
 
             useEffect(() => {
                 if (gameState.menu.length === 0) return;
@@ -2001,22 +1981,25 @@
 
                 // 2. Offline Calculation
                 const lastTime = gameState.lastOnline;
-                const offlineHours = (now - lastTime) / (1000 * 60 * 60);
+                const offlineHoursReal = (now - lastTime) / (1000 * 60 * 60);
+                const gameHoursPerRealHour = 24 / GAME_TIME.REAL_HOURS_PER_GAME_DAY;
+                const offlineHoursGame = offlineHoursReal * gameHoursPerRealHour;
+
                 let offlineNet = 0;
                 let offlineRevenue = 0;
 
-                if (offlineHours > 0.05) {
+                if (offlineHoursReal > 0.05) {
                     const finance = calculateFinance(gameState);
-                    // Conversion: monthlyRevenue / (30 days * 24 hours)
+                    // Conversion: grossRevenueMonthly / (30 days * 24 hours per day)
                     const hourlyRevenue = finance.grossRevenueMonthly / (30 * 24);
                     const hourlyExpenses = finance.monthlyExpenses / (30 * 24);
 
-                    const offlineExpenses = hourlyExpenses * offlineHours;
-                    offlineRevenue = hourlyRevenue * offlineHours;
+                    const offlineExpenses = hourlyExpenses * offlineHoursGame;
+                    offlineRevenue = hourlyRevenue * offlineHoursGame;
                     offlineNet = offlineRevenue - offlineExpenses;
 
                     setOfflineReport({
-                        hours: offlineHours,
+                        hours: offlineHoursGame, // Show game hours in report for consistency
                         revenue: Math.round(offlineRevenue),
                         expenses: Math.round(offlineExpenses),
                         net: Math.round(offlineNet)
@@ -2045,6 +2028,8 @@
                         lastGameDay: gameDay,
                         lastGameMonth: gameMonth,
                         lastOrderNumber: dayChanged ? 0 : (prev.lastOrderNumber || 0),
+                        todayRevenue: dayChanged ? 0 : prev.todayRevenue,
+                        todayCustomers: dayChanged ? 0 : prev.todayCustomers,
                         metrics: updatedMetrics,
                         competitors: newCompetitors
                     };
@@ -2052,10 +2037,37 @@
 
             }, []); // Empty deps = run once on mount
 
-            // Auto-save
+            // Auto-save & Global Day Reset Check
             useEffect(() => {
                 const saveState = { ...gameState, lastOnline: Date.now() };
                 localStorage.setItem('bobaKingState', JSON.stringify(saveState));
+
+                // Global day check interval (runs every 10s to see if day changed)
+                const interval = setInterval(() => {
+                    const { gameDay, gameHour } = getGameTime(gameState.gameStartTime);
+                    const gameMonth = Math.floor((gameDay - 1) / 30) + 1;
+
+                    if (gameDay !== gameState.lastGameDay) {
+                        setGameState(prev => {
+                            const isNewMonth = (gameDay - 1) % 30 === 0 && gameDay > 1;
+                            return {
+                                ...prev,
+                                lastGameDay: gameDay,
+                                lastGameMonth: gameMonth,
+                                todayRevenue: 0,
+                                todayCustomers: 0,
+                                lastOrderNumber: 0,
+                                metrics: {
+                                    ...prev.metrics,
+                                    daily: 0,
+                                    monthly: isNewMonth ? 0 : prev.metrics.monthly
+                                }
+                            };
+                        });
+                    }
+                }, 10000);
+
+                return () => clearInterval(interval);
             }, [gameState]);
 
             const handleServeDrink = (revenue, cost) => {
@@ -2084,10 +2096,16 @@
                 return (
                     <IntroScene
                         onStart={(name) => {
+                            // Start at 11:00 AM for new players
+                            const startHour = 11;
+                            const gameHoursPerRealHour = 24 / GAME_TIME.REAL_HOURS_PER_GAME_DAY;
+                            const startTimeOffsetMs = (startHour / gameHoursPerRealHour) * 3600000;
+
                             setGameState(prev => ({
                                 ...prev,
                                 shopName: name,
-                                hasStarted: true
+                                hasStarted: true,
+                                gameStartTime: Date.now() - startTimeOffsetMs
                             }));
                         }}
                     />
@@ -2135,9 +2153,6 @@
                                     ⚙️ 選單
                                 </h2>
                                 <div className="space-y-3">
-                                    <PixelButton variant="secondary" className="w-full">
-                                        💾 儲存遊戲
-                                    </PixelButton>
                                     <PixelButton
                                         variant="danger"
                                         className="w-full"
@@ -2149,7 +2164,7 @@
                                         🔄 重新開始
                                     </PixelButton>
                                     <PixelButton
-                                        variant="gold"
+                                        variant="secondary"
                                         className="w-full"
                                         onClick={() => setShowMenu(false)}
                                     >
@@ -2158,17 +2173,12 @@
                                 </div>
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
-                                        <div className="text-[10px] font-silkscreen text-stoneLight uppercase tracking-widest opacity-40">
-                                            Bubble Tea Tycoon v1.0.0
+                                        <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
+                                            Bubble Tea Tycoon v1.0.1
                                         </div>
-                                        <a
-                                            href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=cokefever@gmail.com&item_name=Support+Bubble+Tea+Tycoon&no_shipping=1&tax=0&currency_code=USD&amount=0.99"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs font-pixel text-gold hover:text-white transition-colors flex items-center gap-1"
-                                        >
+                                        <span className="text-xs font-pixel text-gold/60 flex items-center gap-1 cursor-default">
                                             💖 請我喝杯手搖飲 🍵
-                                        </a>
+                                        </span>
                                     </div>
                                 </div>
                             </PixelPanel>
