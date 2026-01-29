@@ -209,11 +209,11 @@
         };
 
         const AI_COMPETITORS = [
-            { id: 1, name: '強尼紅茶公社', monthlyRevenue: 850000, tier: '傳奇', color: '#ff6b6b' },
-            { id: 2, name: '60嵐', monthlyRevenue: 620000, tier: '困難', color: '#ffa502' },
-            { id: 3, name: '大名本位', monthlyRevenue: 480000, tier: '普通', color: '#2ed573' },
-            { id: 4, name: 'OG智慧製茶', monthlyRevenue: 350000, tier: '穩健', color: '#1e90ff' },
-            { id: 5, name: '沒飲 Noin', monthlyRevenue: 220000, tier: '新手', color: '#a4b0be' },
+            { id: 1, name: '強尼紅茶公社', monthlyRevenue: 1200000, tier: '傳奇', color: '#ff6b6b' },
+            { id: 2, name: '60嵐', monthlyRevenue: 850000, tier: '困難', color: '#ffa502' },
+            { id: 3, name: '大名本位', monthlyRevenue: 500000, tier: '普通', color: '#2ed573' },
+            { id: 4, name: 'OG智慧製茶', monthlyRevenue: 250000, tier: '穩健', color: '#1e90ff' },
+            { id: 5, name: '沒飲 Noin', monthlyRevenue: 80000, tier: '新手', color: '#a4b0be' },
         ];
 
 
@@ -1677,7 +1677,7 @@
         const INITIAL_STATE = {
             shopName: '我的手搖店', // Default name
             hasStarted: false, // Onboarding flag
-            money: 100000,
+            money: 50000, // Reduced from 100k for harder start
             reputation: 0,
             todayRevenue: 0, // Today's revenue for store display
             todayCustomers: 0, // Today's customer count
@@ -1687,8 +1687,8 @@
             lastOrderNumber: 0, // Sequential order ID for POS
             metrics: { daily: 0, monthly: 0, total: 0 },
             menu: [
-                { id: 1, base: 'black-tea', toppings: ['boba'], price: 45, name: '珍珠紅茶' },
-                { id: 2, base: 'green-tea', toppings: [], price: 25, name: '純綠茶' },
+                { id: 1, base: 'black-tea', toppings: ['boba'], price: 50, name: '珍珠紅茶' }, // Adjusted Price
+                { id: 2, base: 'green-tea', toppings: [], price: 30, name: '純綠茶' },
             ],
             equipment: {
                 teaMachine: 1,
@@ -1697,12 +1697,12 @@
                 marketing: 0,
             },
             staff: {
-                partTime: 1,
+                partTime: 0, // Start with NO staff (Hardcore)
                 fullTime: 0,
                 manager: 0,
             },
             financials: {
-                rent: 50000,
+                rent: 85000, // Increased rent (Taipei 30 lane realistic)
             },
             competitors: AI_COMPETITORS, // Dynamic copy
             is24h: false,
@@ -2001,12 +2001,8 @@
                 let dayChanged = gameDay > (gameState.lastGameDay || 0);
                 let monthChanged = gameMonth > (gameState.lastGameMonth || 0);
 
-                if (dayChanged) {
-                    updatedMetrics.daily = 0;
-                }
-                if (monthChanged) {
-                    updatedMetrics.monthly = 0;
-                }
+                if (dayChanged) updatedMetrics.daily = 0;
+                if (monthChanged) updatedMetrics.monthly = 0;
 
                 // 2. Offline Calculation
                 const lastTime = gameState.lastOnline;
@@ -2016,33 +2012,62 @@
 
                 let offlineNet = 0;
                 let offlineRevenue = 0;
+                let offlineExpenses = 0;
 
-                if (offlineHoursReal > 0.05) {
+                // Minimum 5 minutes off-line to trigger
+                if (offlineHoursReal > 0.08) {
                     const finance = calculateFinance(gameState);
-                    // Conversion: grossRevenueMonthly / (30 days * 24 hours per day)
+                    // Estimate effective business hours
+                    const businessHoursPerDay = gameState.is24h ? 24 : 8; // 11am-7pm = 8h
+                    const effectiveGameHours = offlineHoursGame * (businessHoursPerDay / 24);
+
+                    // Estimate Revenue & Expenses based on monthly projection (normalized to hours)
+                    // grossRevenueMonthly based on traffic which is fairly stable
                     const hourlyRevenue = finance.grossRevenueMonthly / (30 * 24);
                     const hourlyExpenses = finance.monthlyExpenses / (30 * 24);
 
-                    const offlineExpenses = hourlyExpenses * offlineHoursGame;
-                    offlineRevenue = hourlyRevenue * offlineHoursGame;
-                    offlineNet = offlineRevenue - offlineExpenses;
+                    // Apply only for "Business Hours" portion for revenue, but "All Hours" for expenses?
+                    // Actually rental/staff are daily fixed costs regardless of hours open.
+                    // But COGS and Utilities (variable) depend on volume.
+                    // Simplified: Use Net Profit/Hour for effective hours.
 
-                    setOfflineReport({
-                        hours: offlineHoursGame, // Show game hours in report for consistency
-                        revenue: Math.round(offlineRevenue),
-                        expenses: Math.round(offlineExpenses),
-                        net: Math.round(offlineNet)
-                    });
+                    // Offline Expenses (Fixed): (Rent + Base Staff + Base Utilities)
+                    const dailyFixed = (finance.details.rent + finance.details.staff) / 30;
+                    const hourlyFixed = dailyFixed / 24;
 
-                    // Add offline revenue to metrics
-                    updatedMetrics.daily += offlineRevenue;
-                    updatedMetrics.monthly += offlineRevenue;
-                    updatedMetrics.total += offlineRevenue;
+                    // Offline Variable (COGS + Variable Utilities): depends on traffic
+                    // We can just use the 'Net Profit' projection from finance calculator if > 0
+
+                    if (finance.monthlyProjection > 0) {
+                        // Profitable shop: Allow earnings
+                        const hourlyNet = finance.monthlyProjection / (30 * businessHoursPerDay);
+                        offlineNet = hourlyNet * effectiveGameHours;
+                        offlineRevenue = (finance.grossRevenueMonthly / (30 * businessHoursPerDay)) * effectiveGameHours;
+                        offlineExpenses = offlineRevenue - offlineNet;
+                    } else {
+                        // Unprofitable shop: Just bleed fixed costs
+                        // Bleed for ALL game hours passed
+                        offlineExpenses = hourlyFixed * offlineHoursGame;
+                        offlineNet = -offlineExpenses;
+                        offlineRevenue = 0;
+                    }
+
+                    if (Math.abs(offlineNet) > 0) {
+                        setOfflineReport({
+                            hours: offlineHoursReal,
+                            revenue: Math.round(offlineRevenue),
+                            expenses: Math.round(offlineExpenses),
+                            net: Math.round(offlineNet)
+                        });
+
+                        updatedMetrics.daily += offlineRevenue;
+                        updatedMetrics.monthly += offlineRevenue;
+                        updatedMetrics.total += offlineRevenue;
+                    }
                 }
 
                 // 3. Update Game State once on mount
                 setGameState(prev => {
-                    // 4. Simulate Competitors (Only on day change or if new session)
                     const shouldFluctuate = dayChanged || !prev.lastOnline;
                     const newCompetitors = shouldFluctuate
                         ? prev.competitors.map(c => ({
@@ -2060,44 +2085,91 @@
                         todayRevenue: dayChanged ? 0 : prev.todayRevenue,
                         todayCustomers: dayChanged ? 0 : prev.todayCustomers,
                         metrics: updatedMetrics,
-                        competitors: newCompetitors
+                        competitors: newCompetitors,
+                        lastOnline: Date.now()
                     };
                 });
 
-            }, []); // Empty deps = run once on mount
+            }, []); // Run once on mount
 
-            // Auto-save & Global Day Reset Check
+            // Background Simulation & Daily Reset Logic & Auto Save
             useEffect(() => {
-                const saveState = { ...gameState, lastOnline: Date.now() };
-                localStorage.setItem('bobaKingState', JSON.stringify(saveState));
+                const timer = setInterval(() => {
+                    if (!gameState.hasStarted) return;
 
-                // Global day check interval (runs every 10s to see if day changed)
-                const interval = setInterval(() => {
-                    const { gameDay, gameHour } = getGameTime(gameState.gameStartTime);
-                    const gameMonth = Math.floor((gameDay - 1) / 30) + 1;
+                    const now = Date.now();
+                    // Use functional update to always get latest state
+                    setGameState(prev => {
+                        const { gameDay, gameHour } = getGameTime(prev.gameStartTime);
+                        const gameMonth = Math.floor((gameDay - 1) / 30) + 1;
 
-                    if (gameDay !== gameState.lastGameDay) {
-                        setGameState(prev => {
-                            const isNewMonth = (gameDay - 1) % 30 === 0 && gameDay > 1;
-                            return {
-                                ...prev,
-                                lastGameDay: gameDay,
-                                lastGameMonth: gameMonth,
-                                todayRevenue: 0,
-                                todayCustomers: 0,
-                                lastOrderNumber: 0,
-                                metrics: {
-                                    ...prev.metrics,
-                                    daily: 0,
-                                    monthly: isNewMonth ? 0 : prev.metrics.monthly
+                        let nextState = { ...prev, lastOnline: now };
+
+                        // 1. Daily Reset & Deductions
+                        if (gameDay > prev.lastGameDay) {
+                            const finance = calculateFinance(prev);
+                            // Deduct 1 day worth of Fixed Expenses (Rent + Staff)
+                            // COGS/Utilities are deducted per drink, so we only deduct FIXED here.
+                            const dailyFixed = (finance.details.rent + finance.details.staff + 1500) / 30; // 1500 base utilities
+
+                            nextState.money -= Math.round(dailyFixed);
+                            nextState.lastGameDay = gameDay;
+                            nextState.lastGameMonth = gameMonth;
+                            nextState.todayRevenue = 0;
+                            nextState.todayCustomers = 0;
+                            nextState.metrics.daily = 0;
+                            // Monthly Reset
+                            if (gameMonth > prev.lastGameMonth) {
+                                nextState.metrics.monthly = 0;
+                            }
+                        }
+
+                        // 2. Background Idle (Process only if scene is NOT store)
+                        if (currentScene !== 'store') {
+                            const isOpen = isBusinessOpen(gameHour, prev.is24h);
+                            if (isOpen) {
+                                // Simulation Check
+                                // Use Production Speed as probability weight
+                                // Target: 20-50 drinks per game hour?
+                                // 1 Game Hour = 300 real seconds (interval is 1s) -> No
+                                // Real hours/day = 2. 
+                                // 24 game hours = 120 minutes = 7200 seconds.
+                                // 1 game hour = 300 seconds.
+
+                                // If volume is 50 drinks/hour -> 1 drink every 6 seconds.
+                                // Chance = 1/6 ~ 16%.
+                                const finance = calculateFinance(prev);
+                                // Simplified: 10% base chance * speed
+                                const chance = 0.15 * finance.productionSpeed;
+
+                                if (Math.random() < chance) {
+                                    // Sell a random drink
+                                    if (prev.menu.length > 0) {
+                                        const randomDrink = prev.menu[Math.floor(Math.random() * prev.menu.length)];
+                                        const cost = calculateDrinkCost(randomDrink);
+                                        const profit = randomDrink.price - cost;
+
+                                        nextState.money += profit;
+                                        nextState.todayRevenue += randomDrink.price;
+                                        nextState.todayCustomers += 1;
+                                        nextState.metrics.daily += randomDrink.price;
+                                        nextState.metrics.monthly += randomDrink.price;
+                                        nextState.metrics.total += randomDrink.price;
+                                        nextState.reputation += 0.1;
+                                    }
                                 }
-                            };
-                        });
-                    }
-                }, 10000);
+                            }
+                        }
 
-                return () => clearInterval(interval);
-            }, [gameState]);
+                        // Save to local storage (inside the loop for consistency)
+                        localStorage.setItem('bobaKingState', JSON.stringify(nextState));
+
+                        return nextState;
+                    });
+                }, 1000); // 1 Second Tick
+
+                return () => clearInterval(timer);
+            }, [gameState.hasStarted, currentScene]);
 
             const handleServeDrink = (revenue, cost) => {
                 const profit = revenue - cost;
@@ -2203,7 +2275,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.1.1
+                                            Bubble Tea Tycoon v1.1.2
                                         </div>
                                         <span className="text-xs font-pixel text-gold/60 flex items-center gap-1 cursor-default">
                                             💖 請我喝杯手搖飲 🍵
