@@ -1,11 +1,11 @@
 // Service Worker for 手搖飲大王 PWA
-const CACHE_NAME = 'boba-king-v1';
+const CACHE_NAME = 'boba-king-v1.1.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
-  './icons/icon-192.svg',
-  './icons/icon-512.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
   // External CDN resources
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
