@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="description" content="手搖飲大王 - 在永吉路30巷開創你的飲料帝國！">
     <title>🧋 手搖飲大王</title>
     <!-- PWA Support -->
@@ -63,9 +64,23 @@
     <style>
         * {
             -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Prevent selection globally except for inputs */
+        body,
+        button,
+        .pixel-btn,
+        .font-pixel,
+        .font-silkscreen {
             -webkit-touch-callout: none;
             -webkit-user-select: none;
             user-select: none;
+        }
+
+        input,
+        textarea {
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         html,
@@ -278,6 +293,7 @@
 
             return (
                 <button
+                    type="button"
                     onClick={onClick}
                     disabled={disabled}
                     className={`
@@ -319,7 +335,11 @@
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
-                            onClick={() => onTabChange(tab.id)}
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onTabChange(tab.id);
+                            }}
                             className={`
                                 pixel-btn font-pixel text-lg px-4 py-2
                                 border-4 border-b-0 transition-colors
@@ -396,7 +416,11 @@
                             {scenes.map((scene) => (
                                 <button
                                     key={scene.id}
-                                    onClick={() => onSceneChange(scene.id)}
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSceneChange(scene.id);
+                                    }}
                                     className={`
                                         pixel-btn flex-1 mx-1 py-3 font-pixel text-lg
                                         border-4 transition-all duration-100
@@ -1147,217 +1171,217 @@
         };
 
         // ==================== MANAGE SCENE ====================
+        // --- Menu Editor Components ---
+        const MenuEditor = ({ drink, onSave, onCancel }) => {
+            const [name, setName] = useState(drink?.name || '新品項');
+            const [base, setBase] = useState(drink?.base || INGREDIENTS.bases[0].id);
+            const [toppings, setToppings] = useState(drink?.toppings || []);
+            const [price, setPrice] = useState(drink?.price || 50);
+
+            const currentCost = calculateDrinkCost({ base, toppings });
+            const currentAttraction = calculateAttraction({ base, toppings });
+
+            const toggleTopping = (tid) => {
+                if (toppings.includes(tid)) {
+                    setToppings(toppings.filter(t => t !== tid));
+                } else {
+                    if (toppings.length >= 3) return; // Max 3 toppings
+                    setToppings([...toppings, tid]);
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-full">
+                    <h3 className="font-pixel text-gold text-xl mb-4">
+                        {drink?.id ? '✏️ 編輯飲品' : '✨ 研發新品'}
+                    </h3>
+
+                    <div className="flex-1 overflow-y-auto space-y-4">
+                        {/* Name Input */}
+                        <div>
+                            <label className="block font-pixel text-stone mb-1">飲品名稱</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                maxLength={10}
+                                className="w-full bg-dirtDark border-2 border-stoneDark text-white p-2 font-pixel text-lg focus:outline-none focus:border-gold"
+                            />
+                        </div>
+
+                        {/* Base Selection */}
+                        <div>
+                            <label className="block font-pixel text-stone mb-1">基底茶</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {INGREDIENTS.bases.map(b => (
+                                    <button
+                                        key={b.id}
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setBase(b.id); }}
+                                        className={`
+                                                p-2 border-2 text-left transition-colors
+                                                ${base === b.id
+                                                ? 'bg-grass border-grassDark text-white'
+                                                : 'bg-stoneDark border-stone text-stoneLight'}
+                                            `}
+                                    >
+                                        <div className="font-pixel">{b.emoji} {b.name}</div>
+                                        <div className="font-pixel text-xs opacity-75">${b.cost} | ⭐{b.attraction}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Toppings Selection */}
+                        <div>
+                            <label className="block font-pixel text-stone mb-1">配料 (最多3種)</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {INGREDIENTS.toppings.map(t => (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); toggleTopping(t.id); }}
+                                        className={`
+                                                p-2 border-2 text-left transition-colors
+                                                ${toppings.includes(t.id)
+                                                ? 'bg-dirt border-dirtDark text-white'
+                                                : 'bg-stoneDark border-stone text-stoneLight'}
+                                            `}
+                                    >
+                                        <div className="font-pixel">{t.emoji} {t.name}</div>
+                                        <div className="font-pixel text-xs opacity-75">${t.cost} | ⭐{t.attraction}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Price Setting */}
+                        <div>
+                            <label className="block font-pixel text-stone mb-1">售價與分析</label>
+                            <div className="flex items-center gap-4 mb-2">
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setPrice(p => Math.max(0, p - 5)); }}
+                                    className="bg-stoneDark w-10 h-10 text-white font-bold border-2 border-stone"
+                                >-</button>
+                                <div className="flex-1 text-center bg-dirtDark p-2 border-2 border-stoneDark text-gold text-2xl font-pixel">
+                                    ${price}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setPrice(p => p + 5); }}
+                                    className="bg-stoneDark w-10 h-10 text-white font-bold border-2 border-stone"
+                                >+</button>
+                            </div>
+                            <div className="text-sm font-pixel text-stoneLight space-y-1">
+                                <div className="flex justify-between">
+                                    <span>總成本:</span> <span className="text-white">${currentCost}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>單杯毛利:</span> <span className={price - currentCost > 0 ? 'text-grassLight' : 'text-red-400'}>${price - currentCost}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>總吸引力:</span> <span className="text-gold">{currentAttraction}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-4 pt-4 border-t-2 border-stoneDark">
+                        <PixelButton variant="secondary" className="flex-1" onClick={onCancel}>取消</PixelButton>
+                        <PixelButton
+                            variant="gold"
+                            className="flex-1"
+                            onClick={() => onSave({
+                                id: drink?.id || Date.now(),
+                                name, base, toppings, price
+                            })}
+                        >
+                            確定
+                        </PixelButton>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Upgrade Item Component ---
+        const UpgradeItem = ({ id, currentLevel, data, onUpgrade, money }) => {
+            const nextLevel = currentLevel + 1;
+            const cost = Math.round(data.baseCost * Math.pow(1.5, currentLevel));
+            const isMax = currentLevel >= data.maxLevel;
+            const canAfford = money >= cost;
+
+            return (
+                <div className="bg-dirtDark p-3 mb-2 border-2 border-stoneDark">
+                    <div className="flex justify-between items-start mb-2">
+                        <div>
+                            <div className="font-pixel text-white text-lg">{data.name}</div>
+                            <div className="font-pixel text-stone text-sm">Lv.{currentLevel} / {data.maxLevel}</div>
+                        </div>
+                        <div className="text-2xl">{data.icon}</div>
+                    </div>
+                    <p className="font-pixel text-stoneLight text-sm mb-3 h-10 line-clamp-2">
+                        {data.description}
+                    </p>
+                    {isMax ? (
+                        <div className="bg-stoneDark text-stone text-center py-2 font-pixel border-2 border-stone">
+                            已達最高等級
+                        </div>
+                    ) : (
+                        <PixelButton
+                            variant={canAfford ? 'gold' : 'secondary'}
+                            size="sm"
+                            className="w-full flex justify-between items-center"
+                            onClick={() => onUpgrade(id, cost)}
+                            disabled={!canAfford}
+                        >
+                            <span>升級</span>
+                            <span>${cost.toLocaleString()}</span>
+                        </PixelButton>
+                    )}
+                </div>
+            );
+        };
+
+        const StaffCard = ({ title, count, salary, type, onUpdateGameState }) => (
+            <div className="bg-dirtDark p-3 mb-2 border-2 border-stoneDark flex justify-between items-center">
+                <div>
+                    <div className="font-pixel text-white text-lg">{title}</div>
+                    <div className="font-pixel text-stone text-sm">${salary.toLocaleString()}/月</div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <PixelButton
+                        variant="secondary"
+                        size="sm"
+                        disabled={count <= 0}
+                        onClick={() => {
+                            onUpdateGameState(prev => ({
+                                ...prev,
+                                staff: { ...prev.staff, [type]: prev.staff[type] - 1 }
+                            }));
+                        }}
+                    >-</PixelButton>
+                    <span className="font-pixel text-xl w-6 text-center">{count}</span>
+                    <PixelButton
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                            onUpdateGameState(prev => ({
+                                ...prev,
+                                staff: { ...prev.staff, [type]: prev.staff[type] + 1 }
+                            }));
+                        }}
+                    >+</PixelButton>
+                </div>
+            </div>
+        );
+
+        // ==================== MANAGE SCENE ====================
         const ManageScene = ({ gameState, onUpdateGameState, projection, metrics }) => {
             const [activeTab, setActiveTab] = useState('menu');
             const [editingDrink, setEditingDrink] = useState(null); // null = list view, object = editing
             const [drinkToDelete, setDrinkToDelete] = useState(null);
             const [rankPeriod, setRankPeriod] = useState('monthly'); // daily, monthly, total
-
-
-            // --- Settings & Tabs ---
-
-            // --- Menu Editor Components ---
-            const MenuEditor = ({ drink, onSave, onCancel }) => {
-                const [name, setName] = useState(drink?.name || '新品項');
-                const [base, setBase] = useState(drink?.base || INGREDIENTS.bases[0].id);
-                const [toppings, setToppings] = useState(drink?.toppings || []);
-                const [price, setPrice] = useState(drink?.price || 50);
-
-                const currentCost = calculateDrinkCost({ base, toppings });
-                const currentAttraction = calculateAttraction({ base, toppings });
-
-                const toggleTopping = (tid) => {
-                    if (toppings.includes(tid)) {
-                        setToppings(toppings.filter(t => t !== tid));
-                    } else {
-                        if (toppings.length >= 3) return; // Max 3 toppings
-                        setToppings([...toppings, tid]);
-                    }
-                };
-
-                return (
-                    <div className="flex flex-col h-full">
-                        <h3 className="font-pixel text-gold text-xl mb-4">
-                            {drink ? '✏️ 編輯飲品' : '✨ 研發新品'}
-                        </h3>
-
-                        <div className="flex-1 overflow-y-auto space-y-4">
-                            {/* Name Input */}
-                            <div>
-                                <label className="block font-pixel text-stone mb-1">飲品名稱</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    maxLength={10}
-                                    className="w-full bg-dirtDark border-2 border-stoneDark text-white p-2 font-pixel text-lg focus:outline-none focus:border-gold"
-                                />
-                            </div>
-
-                            {/* Base Selection */}
-                            <div>
-                                <label className="block font-pixel text-stone mb-1">基底茶</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {INGREDIENTS.bases.map(b => (
-                                        <button
-                                            key={b.id}
-                                            onClick={() => setBase(b.id)}
-                                            className={`
-                                                p-2 border-2 text-left transition-colors
-                                                ${base === b.id
-                                                    ? 'bg-grass border-grassDark text-white'
-                                                    : 'bg-stoneDark border-stone text-stoneLight'}
-                                            `}
-                                        >
-                                            <div className="font-pixel">{b.emoji} {b.name}</div>
-                                            <div className="font-pixel text-xs opacity-75">${b.cost} | ⭐{b.attraction}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Toppings Selection */}
-                            <div>
-                                <label className="block font-pixel text-stone mb-1">配料 (最多3種)</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {INGREDIENTS.toppings.map(t => (
-                                        <button
-                                            key={t.id}
-                                            onClick={() => toggleTopping(t.id)}
-                                            className={`
-                                                p-2 border-2 text-left transition-colors
-                                                ${toppings.includes(t.id)
-                                                    ? 'bg-dirt border-dirtDark text-white'
-                                                    : 'bg-stoneDark border-stone text-stoneLight'}
-                                            `}
-                                        >
-                                            <div className="font-pixel">{t.emoji} {t.name}</div>
-                                            <div className="font-pixel text-xs opacity-75">${t.cost} | ⭐{t.attraction}</div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Price Setting */}
-                            <div>
-                                <label className="block font-pixel text-stone mb-1">售價與分析</label>
-                                <div className="flex items-center gap-4 mb-2">
-                                    <button
-                                        onClick={() => setPrice(p => Math.max(0, p - 5))}
-                                        className="bg-stoneDark w-10 h-10 text-white font-bold border-2 border-stone"
-                                    >-</button>
-                                    <div className="flex-1 text-center bg-dirtDark p-2 border-2 border-stoneDark text-gold text-2xl font-pixel">
-                                        ${price}
-                                    </div>
-                                    <button
-                                        onClick={() => setPrice(p => p + 5)}
-                                        className="bg-stoneDark w-10 h-10 text-white font-bold border-2 border-stone"
-                                    >+</button>
-                                </div>
-                                <div className="text-sm font-pixel text-stoneLight space-y-1">
-                                    <div className="flex justify-between">
-                                        <span>總成本:</span> <span className="text-white">${currentCost}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>單杯毛利:</span> <span className={price - currentCost > 0 ? 'text-grassLight' : 'text-red-400'}>${price - currentCost}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>總吸引力:</span> <span className="text-gold">{currentAttraction}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2 mt-4 pt-4 border-t-2 border-stoneDark">
-                            <PixelButton variant="secondary" className="flex-1" onClick={onCancel}>取消</PixelButton>
-                            <PixelButton
-                                variant="gold"
-                                className="flex-1"
-                                onClick={() => onSave({
-                                    id: drink?.id || Date.now(),
-                                    name, base, toppings, price
-                                })}
-                            >
-                                確定
-                            </PixelButton>
-                        </div>
-                    </div>
-                );
-            };
-
-            // --- Upgrade Item Component ---
-            const UpgradeItem = ({ id, currentLevel, data, onUpgrade }) => {
-                const nextLevel = currentLevel + 1;
-                const cost = data.baseCost * Math.pow(1.5, currentLevel);
-                const isMax = currentLevel >= data.maxLevel;
-                const canAfford = gameState.money >= cost;
-
-                return (
-                    <div className="bg-dirtDark p-3 mb-2 border-2 border-stoneDark">
-                        <div className="flex justify-between items-start mb-2">
-                            <div>
-                                <div className="font-pixel text-white text-lg">{data.name}</div>
-                                <div className="font-pixel text-stone text-sm">Lv.{currentLevel} / {data.maxLevel}</div>
-                            </div>
-                            <div className="text-2xl">{data.icon}</div>
-                        </div>
-                        <p className="font-pixel text-stoneLight text-sm mb-3 h-10 line-clamp-2">
-                            {data.description}
-                        </p>
-                        {isMax ? (
-                            <div className="bg-stoneDark text-stone text-center py-2 font-pixel border-2 border-stone">
-                                已達最高等級
-                            </div>
-                        ) : (
-                            <PixelButton
-                                variant={canAfford ? 'gold' : 'secondary'}
-                                size="sm"
-                                className="w-full flex justify-between items-center"
-                                onClick={() => onUpgrade(id, cost)}
-                                disabled={!canAfford}
-                            >
-                                <span>升級</span>
-                                <span>${formatMoney(cost)}</span>
-                            </PixelButton>
-                        )}
-                    </div>
-                );
-            };
-
-            const StaffCard = ({ title, count, salary, type }) => (
-                <div className="bg-dirtDark p-3 mb-2 border-2 border-stoneDark flex justify-between items-center">
-                    <div>
-                        <div className="font-pixel text-white text-lg">{title}</div>
-                        <div className="font-pixel text-stone text-sm">${formatMoney(salary)}/月</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <PixelButton
-                            variant="secondary"
-                            size="sm"
-                            disabled={count <= 0}
-                            onClick={() => {
-                                onUpdateGameState(prev => ({
-                                    ...prev,
-                                    staff: { ...prev.staff, [type]: prev.staff[type] - 1 }
-                                }));
-                            }}
-                        >-</PixelButton>
-                        <span className="font-pixel text-xl w-6 text-center">{count}</span>
-                        <PixelButton
-                            variant="primary"
-                            size="sm"
-                            onClick={() => {
-                                onUpdateGameState(prev => ({
-                                    ...prev,
-                                    staff: { ...prev.staff, [type]: prev.staff[type] + 1 }
-                                }));
-                            }}
-                        >+</PixelButton>
-                    </div>
-                </div>
-            );
-
-
 
             const tabs = [
                 { id: 'menu', label: '菜單', icon: '🍹' },
@@ -1410,12 +1434,14 @@
                                         </div>
                                         <div className="flex gap-2">
                                             <button
+                                                type="button"
                                                 onClick={() => setEditingDrink(drink)}
                                                 className="flex-1 bg-stoneDark text-white font-pixel py-1 border-2 border-stone hover:bg-stone"
                                             >
                                                 編輯
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={() => setDrinkToDelete(drink)}
                                                 className="flex-1 bg-red-900 text-red-100 font-pixel py-1 border-2 border-red-800 hover:bg-red-800"
                                             >
@@ -1453,6 +1479,7 @@
                                         id={item.id}
                                         currentLevel={gameState.equipment[item.id] || 0}
                                         data={item}
+                                        money={gameState.money}
                                         onUpgrade={(id, cost) => {
                                             onUpdateGameState(prev => ({
                                                 ...prev,
@@ -1475,109 +1502,67 @@
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="font-pixel text-white text-lg">24小時營業</span>
                                         <button
+                                            type="button"
                                             onClick={() => onUpdateGameState(prev => ({ ...prev, is24h: !prev.is24h }))}
                                             className={`
-                                                w-16 h-8 rounded-full border-2 transition-colors relative
-                                                ${gameState.is24h ? 'bg-grass border-grassDark' : 'bg-stoneDark border-stone'}
-                                            `}
-                                        >
+                                            w-16 h-8 rounded-full border-2 transition-colors relative
+                                            ${gameState.is24h ? 'bg-grass border-grassDark' : 'bg-stoneDark border-stone'}
+                                            `}>
                                             <div className={`
-                                                absolute top-1 w-5 h-5 bg-white rounded-full transition-all
-                                                ${gameState.is24h ? 'right-1' : 'left-1'}
+                                            absolute top-1 w-5 h-5 bg-white rounded-full transition-all
+                                            ${gameState.is24h ? 'right-1' : 'left-1'}
                                             `}></div>
                                         </button>
                                     </div>
                                     <p className="font-pixel text-stoneLight text-sm">
                                         開啟後需應對三班制排班。理想配置：每班 1 正職 + 1 兼職。
-                                        {gameState.is24h && (
-                                            <div className="mt-2 space-y-1 bg-black/30 p-2 border border-stoneDark">
-                                                <div className="flex justify-between">
-                                                    <span>排班覆蓋率:</span>
-                                                    <span className={metrics.efficiencyBreakdown.coverage < 1 ? 'text-red-400' : 'text-grassLight'}>
-                                                        {Math.round(metrics.efficiencyBreakdown.coverage * 100)}%
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span>管理效益:</span>
-                                                    <span className={metrics.efficiencyBreakdown.manager < 1 ? 'text-red-400' : 'text-grassLight'}>
-                                                        x{metrics.efficiencyBreakdown.manager.toFixed(1)}
-                                                    </span>
-                                                </div>
-                                                {metrics.efficiencyBreakdown.overcrowding > 0 && (
-                                                    <div className="flex justify-between text-red-400">
-                                                        <span>擁擠懲罰:</span>
-                                                        <span>-{Math.round(metrics.efficiencyBreakdown.overcrowding * 100)}%</span>
-                                                    </div>
-                                                )}
-                                                <div className="border-t border-stoneDark my-1"></div>
-                                                <div className="flex justify-between font-bold text-white">
-                                                    <span>最終效率:</span>
-                                                    <span>{Math.round(metrics.efficiencyBreakdown.total * 100)}%</span>
-                                                </div>
-                                            </div>
-                                        )}
                                     </p>
                                 </div>
 
-                                <StaffCard title="工讀生 (Part-time)" count={gameState.staff.partTime} salary={35000} type="partTime" />
-                                <StaffCard title="正職人員 (Full-time)" count={gameState.staff.fullTime} salary={45000} type="fullTime" />
-                                <StaffCard title="店經理 (Manager)" count={gameState.staff.manager} salary={60000} type="manager" />
+                                <StaffCard title="工讀生 (Part-time)" count={gameState.staff.partTime} salary={35000} type="partTime" onUpdateGameState={onUpdateGameState} />
+                                <StaffCard title="正職人員 (Full-time)" count={gameState.staff.fullTime} salary={45000} type="fullTime" onUpdateGameState={onUpdateGameState} />
+                                <StaffCard title="店經理 (Manager)" count={gameState.staff.manager} salary={60000} type="manager" onUpdateGameState={onUpdateGameState} />
                             </div>
                         )}
 
                         {!editingDrink && activeTab === 'finance' && (
-                            <div>
-                                <h3 className="font-pixel text-gold text-xl mb-4">💹 財務報表</h3>
-                                <div className="space-y-3 px-1">
-                                    <div className="bg-dirtDark p-3 border-2 border-stoneDark">
-                                        <div className="font-pixel text-stone">現金資產</div>
-                                        <div className="font-pixel text-gold text-2xl">
-                                            {formatMoney(gameState.money)}
+                            <div className="space-y-4">
+                                <h3 className="font-pixel text-gold text-xl mb-2">💹 財務報表 (預計每月)</h3>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center font-pixel text-white bg-black/20 p-2 border-b border-stoneDark">
+                                        <span>總營收</span>
+                                        <span className="text-grassLight">{formatMoney(metrics.details.revenue)}</span>
+                                    </div>
+                                    <div className="space-y-1 px-2 pt-1">
+                                        <div className="flex justify-between font-pixel text-sm text-stone">
+                                            <span>食材成本 (COGS)</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.cogs)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm text-stone">
+                                            <span>員工薪資</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.staff)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm text-stone">
+                                            <span>店面租金</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.rent)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm text-stone">
+                                            <span>水電雜支</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.utilities)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm text-stone">
+                                            <span>設備維護</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.maintenance)}</span>
                                         </div>
                                     </div>
 
-                                    <div className="bg-dirtDark p-3 border-2 border-stoneDark">
-                                        <div className="font-pixel text-white mb-2 border-b border-stoneDark pb-1">本月營運分析 (預估)</div>
-
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between font-pixel">
-                                                <span className="text-stone">總營收</span>
-                                                <span className="text-grassLight">{formatMoney(metrics.details.revenue)}</span>
-                                            </div>
-
-                                            <div className="flex justify-between font-pixel">
-                                                <span className="text-stone">原物料成本 (COGS)</span>
-                                                <span className="text-red-300">-{formatMoney(metrics.details.cogs)}</span>
-                                            </div>
-
-                                            <div className="border-t border-dashed border-stoneDark my-1"></div>
-
-                                            <div className="flex justify-between font-pixel text-sm">
-                                                <span className="text-stoneLight">店底租金</span>
-                                                <span className="text-red-400">-{formatMoney(metrics.details.rent)}</span>
-                                            </div>
-
-                                            <div className="flex justify-between font-pixel text-sm">
-                                                <span className="text-stoneLight">人力薪資</span>
-                                                <span className="text-red-400">-{formatMoney(metrics.details.staff)}</span>
-                                            </div>
-
-                                            <div className="flex justify-between font-pixel text-sm">
-                                                <span className="text-stoneLight">水電雜費 ({gameState.is24h ? '24H' : '標準'})</span>
-                                                <span className="text-red-400">-{formatMoney(metrics.details.utilities)}</span>
-                                            </div>
-
-                                            <div className="flex justify-between font-pixel text-sm">
-                                                <span className="text-stoneLight">設備維護費</span>
-                                                <span className="text-red-400">-{formatMoney(metrics.details.maintenance)}</span>
-                                            </div>
-
-                                            <div className="border-t-2 border-stoneDark pt-2 mt-2 flex justify-between font-pixel text-lg">
-                                                <span className="text-white">本月預計淨利</span>
-                                                <span className={projection >= 0 ? 'text-gold' : 'text-red-500'}>
-                                                    {formatMoney(projection)}
-                                                </span>
-                                            </div>
+                                    <div className="mt-4 p-3 bg-dirt border-2 border-dirtDark">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="font-pixel text-white text-lg">預估淨利</span>
+                                            <span className={`font-pixel text-2xl ${metrics.monthlyProjection > 0 ? 'text-grassLight' : 'text-red-500'}`}>
+                                                {formatMoney(metrics.monthlyProjection)}
+                                            </span>
                                         </div>
                                     </div>
 
@@ -1597,6 +1582,7 @@
                                     {['daily', 'monthly', 'total'].map(p => (
                                         <button
                                             key={p}
+                                            type="button"
                                             onClick={() => setRankPeriod(p)}
                                             className={`flex-1 py-1 font-pixel text-sm border-2 ${rankPeriod === p
                                                 ? 'bg-gold text-dirtDark border-white'
@@ -1673,7 +1659,6 @@
                 </div>
             );
         };
-
         const INITIAL_STATE = {
             shopName: '我的手搖店', // Default name
             hasStarted: false, // Onboarding flag
@@ -2304,7 +2289,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.1.3
+                                            Bubble Tea Tycoon v1.1.5
                                         </div>
                                         <span className="text-xs font-pixel text-gold/60 flex items-center gap-1 cursor-default">
                                             💖 請我喝杯手搖飲 🍵
