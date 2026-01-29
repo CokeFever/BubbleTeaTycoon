@@ -1,5 +1,5 @@
 // Service Worker for 手搖飲大王 PWA
-const CACHE_NAME = 'boba-king-v1.1.2';
+const CACHE_NAME = 'boba-king-v1.1.3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
