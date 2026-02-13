@@ -1998,20 +1998,69 @@
             const [registerModalMode, setRegisterModalMode] = useState('form'); // 'form', 'offline', 'low_rank', 'already_registered'
             const [registerId, setRegisterId] = useState('');
             const [deferredPrompt, setDeferredPrompt] = useState(null);
+            const [showUpdatePrompt, setShowUpdatePrompt] = useState(false); // New PWA Update Prompt
 
             // Device detection
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
             const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator && window.navigator.standalone);
 
-            // Install Prompt Listener
+            // Install Prompt Listener & Service Worker Update Check
             useEffect(() => {
+                // Install Prompt
                 const handler = (e) => {
                     e.preventDefault();
                     setDeferredPrompt(e);
                 };
                 window.addEventListener('beforeinstallprompt', handler);
+
+                // Service Worker Update Listener
+                if ('serviceWorker' in navigator) {
+                    // Check for updates every time page loads
+                    navigator.serviceWorker.ready.then(registration => {
+                        // If there's a waiting worker, update is ready
+                        if (registration.waiting) {
+                            setShowUpdatePrompt(true);
+                        }
+
+                        // Listen for new workers
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    setShowUpdatePrompt(true);
+                                }
+                            });
+                        });
+                    });
+
+                    // Reload when new worker takes control (skipWaiting called)
+                    let refreshing = false;
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        if (!refreshing) {
+                            refreshing = true;
+                            window.location.reload();
+                        }
+                    });
+                }
+
                 return () => window.removeEventListener('beforeinstallprompt', handler);
             }, []);
+
+            const handleUpdateClick = () => {
+                // Force update logic (skipWaiting usually handles this automatically if implemented in SW)
+                // If we are here, likely waiting. Post message to skipWaiting.
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(registration => {
+                        if (registration.waiting) {
+                            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        } else {
+                            window.location.reload();
+                        }
+                    });
+                } else {
+                    window.location.reload();
+                }
+            };
 
             const handleInstallClick = async () => {
                 if (!deferredPrompt) return;
@@ -2823,6 +2872,27 @@
                                 <PixelButton variant="secondary" className="w-full mt-2" onClick={() => setShowChangelog(false)}>
                                     關閉
                                 </PixelButton>
+                            </PixelPanel>
+                        </div>
+                    )}
+
+                    {/* Update Prompt Toast */}
+                    {showUpdatePrompt && (
+                        <div className="fixed bottom-4 right-4 z-[100] animate-bounce">
+                            <PixelPanel variant="gold" className="p-2 flex items-center gap-3 shadow-2xl">
+                                <div className="text-left">
+                                    <div className="font-silkscreen text-dirtDark text-xs">NEW VERSION</div>
+                                    <div className="font-pixel text-dirtDark text-sm">發布新版本!</div>
+                                </div>
+                                <PixelButton variant="primary" size="sm" onClick={handleUpdateClick}>
+                                    🔄 更新
+                                </PixelButton>
+                                <button
+                                    onClick={() => setShowUpdatePrompt(false)}
+                                    className="text-dirtDark hover:text-red-600 font-bold px-1"
+                                >
+                                    ✕
+                                </button>
                             </PixelPanel>
                         </div>
                     )}
