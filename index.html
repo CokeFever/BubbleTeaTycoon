@@ -1208,6 +1208,7 @@
             const [milk, setMilk] = useState(drink?.milk || 'none');
             const [toppings, setToppings] = useState(drink?.toppings || []);
             const [price, setPrice] = useState(drink?.price || 50);
+            const [editingPrice, setEditingPrice] = useState(false);
 
             const currentCost = calculateDrinkCost({ base, milk, toppings });
             const currentAttraction = calculateAttraction({ base, milk, toppings });
@@ -1319,9 +1320,27 @@
                                     onClick={(e) => { e.stopPropagation(); setPrice(p => Math.max(0, p - 5)); }}
                                     className="bg-stoneDark w-10 h-10 text-white font-bold border-2 border-stone"
                                 >-</button>
-                                <div className="flex-1 text-center bg-dirtDark p-2 border-2 border-stoneDark text-gold text-2xl font-pixel">
-                                    ${price}
-                                </div>
+                                {editingPrice ? (
+                                    <input
+                                        type="number"
+                                        autoFocus
+                                        value={price}
+                                        onChange={(e) => setPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                                        onBlur={() => setEditingPrice(false)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') setEditingPrice(false); }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="flex-1 text-center bg-dirtDark p-2 border-2 border-gold text-gold text-2xl font-pixel outline-none w-full appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                        style={{ MozAppearance: 'textfield' }}
+                                    />
+                                ) : (
+                                    <div
+                                        className="flex-1 text-center bg-dirtDark p-2 border-2 border-stoneDark text-gold text-2xl font-pixel cursor-pointer hover:border-gold transition-colors"
+                                        onClick={(e) => { e.stopPropagation(); setEditingPrice(true); }}
+                                        title="點擊直接輸入金額"
+                                    >
+                                        ${price}
+                                    </div>
+                                )}
                                 <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); setPrice(p => p + 5); }}
@@ -2480,7 +2499,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.2.1
+                                            Bubble Tea Tycoon v1.2.2
                                         </div>
                                         <a
                                             href="https://buymeacoffee.com/cokefever"
@@ -2518,12 +2537,36 @@
                                     📝 更新內容
                                 </h2>
 
-                                {/* v1.2.1 */}
+                                {/* v1.2.2 */}
                                 <div className="mb-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-gold text-dirtDark font-pixel text-xs px-2 py-0.5 border-2 border-goldDark">NEW</span>
-                                        <span className="font-silkscreen text-white text-sm">v1.2.1</span>
+                                        <span className="font-silkscreen text-white text-sm">v1.2.2</span>
                                         <span className="font-pixel text-stone text-xs">2025.02.13</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>修正離線遊玩體驗</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            修復了飛航模式下無法開啟遊戲的問題。請注意：更新後需在有網路環境下開啟一次遊戲以快取資源。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>開放飲料金額直接輸入</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            點擊飲品售價數字可直接輸入金額，不再需要慢慢按 + - 按鈕。
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* v1.2.1 */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">過往</span>
+                                        <span className="font-silkscreen text-stoneLight text-sm">v1.2.1</span>
                                     </div>
                                     <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
                                         <div className="font-pixel text-white text-sm flex gap-2">
