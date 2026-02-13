@@ -1,11 +1,12 @@
 // Service Worker for 手搖飲大王 PWA
-const CACHE_NAME = 'boba-king-v1.2.1';
+const CACHE_NAME = 'boba-king-v1.2.4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './leaderboard.html',
   // External CDN resources
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -60,7 +61,8 @@ self.addEventListener('fetch', (event) => {
   // Skip Google Analytics / Tag Manager only (NOT Google Fonts)
   if (url.includes('googletagmanager.com') ||
     url.includes('google-analytics.com') ||
-    url.includes('analytics')) {
+    url.includes('analytics') ||
+    url.includes('script.google.com')) {
     return;
   }
 
