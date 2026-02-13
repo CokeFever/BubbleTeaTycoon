@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🧋 全球富豪榜 - 手搖飲大王</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'VT323', monospace;
+            background-color: #2d1f14;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .font-pixel {
+            font-family: 'VT323', monospace;
+        }
+
+        .font-silkscreen {
+            font-family: 'Silkscreen', cursive;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #2d1f14;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #5d4037;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8d6e63;
+        }
+    </style>
+</head>
+
+<body class="text-white min-h-screen flex flex-col items-center py-8 px-4">
+
+    <div class="w-full max-w-2xl">
+        <!-- Header -->
+        <div class="text-center mb-8 animate-bounce">
+            <div class="text-6xl mb-2">🏆</div>
+            <h1
+                class="font-silkscreen text-gold text-4xl tracking-wider text-[#ffd700] drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">
+                GLOBAL RANKING
+            </h1>
+            <p class="text-stone-400 mt-2 font-pixel text-xl">手搖飲大王全球富豪榜</p>
+        </div>
+
+        <!-- Leaderboard Container -->
+        <div class="bg-[#3e2723] border-4 border-[#5d4037] p-1 rounded-sm shadow-xl relative">
+            <!-- Decorative Corners -->
+            <div class="absolute -top-2 -left-2 w-4 h-4 bg-[#ffd700] border-2 border-black"></div>
+            <div class="absolute -top-2 -right-2 w-4 h-4 bg-[#ffd700] border-2 border-black"></div>
+            <div class="absolute -bottom-2 -left-2 w-4 h-4 bg-[#ffd700] border-2 border-black"></div>
+            <div class="absolute -bottom-2 -right-2 w-4 h-4 bg-[#ffd700] border-2 border-black"></div>
+
+            <!-- Table Header -->
+            <div
+                class="grid grid-cols-12 gap-2 p-3 bg-[#1a120b] border-b-2 border-[#5d4037] font-silkscreen text-[#ffd700] text-lg">
+                <div class="col-span-1 text-center">#</div>
+                <div class="col-span-4 pl-2">SHOP NAME</div>
+                <div class="col-span-3 text-right">WEALTH</div>
+                <div class="col-span-2 text-center">ID</div>
+                <div class="col-span-2 text-right pr-2">DATE</div>
+            </div>
+
+            <!-- List -->
+            <div id="ranking-list" class="divide-y divide-[#5d4037] max-h-[60vh] overflow-y-auto bg-[#2d1f14]">
+                <!-- Loading State -->
+                <div class="p-8 text-center text-stone-500 font-pixel text-xl animate-pulse">
+                    讀取數據中 / Loading...
+                </div>
+            </div>
+
+            <!-- Footer Info -->
+            <div
+                class="p-3 bg-[#1a120b] border-t-2 border-[#5d4037] flex justify-between items-center text-xs text-stone-500 font-pixel">
+                <span id="data-source">* 資料來源：讀取中...</span>
+                <span id="update-time"></span>
+            </div>
+        </div>
+
+        <!-- Back Button -->
+        <div class="mt-8 text-center">
+            <button onclick="window.close()"
+                class="px-6 py-3 bg-[#5d4037] hover:bg-[#795548] text-[#ffd700] border-4 border-[#3e2723] font-silkscreen text-xl transition-transform active:scale-95 shadow-lg">
+                CLOSE
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 🔹 與遊戲主程式 index.html 保持一致
+        const GAS_API_URL = "";
+
+        // Format money helper
+        const formatMoney = (amount) => {
+            if (amount >= 100000000) return `$${(amount / 100000000).toFixed(2)}億`;
+            if (amount >= 10000) return `$${(amount / 10000).toFixed(1)}萬`;
+            return `$${amount}`;
+        };
+
+        // Mock Data (Always shown mixed in or as fallback base)
+        const MOCK_DATA = [
+            { name: "Elon's Tea", money: 9999999999, id: "TESLA_KING", date: "2025-01-01" },
+            { name: "Bufett Boba", money: 888888888, id: "OMAHA_GOD", date: "2025-02-12" },
+            { name: "Gamania Bear", money: 50000000, id: "ORANGE_01", date: "2025-02-10" },
+        ];
+
+        async function loadLeaderboard() {
+            const listContainer = document.getElementById('ranking-list');
+            const sourceLabel = document.getElementById('data-source');
+
+            let finalData = [];
+            let source = "Init";
+
+            try {
+                // 1. Try Fetch from GAS
+                if (GAS_API_URL) {
+                    try {
+                        const response = await fetch(GAS_API_URL);
+                        const cloudData = await response.json();
+                        if (Array.isArray(cloudData)) {
+                            // If cloud returns data, use it (and maybe mix with MOCK if cloud is empty?)
+                            // Cloud usually returns top 50.
+                            // We will just use Cloud data + Mock data if cloud is sparse?
+                            // Let's just use Cloud Data.
+                            finalData = cloudData;
+                            source = "Google Cloud";
+                        }
+                    } catch (e) {
+                        console.error("Cloud fetch failed", e);
+                        source = "Fetch Error (Fallback Local)";
+                        // Fall through to local
+                    }
+                }
+
+                // 2. If no cloud data (or failed), use Local Storage
+                if (finalData.length === 0) {
+                    try {
+                        const stored = localStorage.getItem('boba_global_leaderboard');
+                        if (stored) {
+                            finalData = JSON.parse(stored);
+                            source = "Local Storage (模擬)";
+                        } else {
+                            source = "Mock Data (僅供參考)";
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse local data', e);
+                    }
+
+                    // Combine with Mock Data for richness if local/empty
+                    // Deduplicate? No, just concat.
+                    finalData = [...MOCK_DATA, ...finalData];
+                }
+
+                // 3. Sort by Money (Desc)
+                // Convert money to number just in case
+                finalData.forEach(d => d.money = Number(d.money));
+                finalData.sort((a, b) => b.money - a.money);
+
+                // 4. Render
+                if (finalData.length === 0) {
+                    listContainer.innerHTML = '<div class="p-8 text-center text-stone-500">暫無資料</div>';
+                } else {
+                    listContainer.innerHTML = finalData.map((item, index) => {
+                        const rankColor = index === 0 ? 'text-[#ffd700]' : index === 1 ? 'text-[#c0c0c0]' : index === 2 ? 'text-[#cd7f32]' : 'text-stone-400';
+                        const bgClass = index % 2 === 0 ? 'bg-[#2d1f14]' : 'bg-[#3e2723]/30';
+
+                        // Parse date
+                        let dateStr = item.date;
+                        if (dateStr && dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+
+                        return `
+                            <div class="grid grid-cols-12 gap-2 p-3 items-center hover:bg-white/5 transition-colors ${bgClass}">
+                                <div class="col-span-1 text-center font-silkscreen text-xl ${rankColor}">
+                                    ${index + 1}
+                                </div>
+                                <div class="col-span-4 pl-2 font-pixel text-white truncate text-lg" title="${item.name}">
+                                    ${item.name}
+                                </div>
+                                <div class="col-span-3 text-right font-pixel text-[#81c784] text-lg">
+                                    ${formatMoney(item.money)}
+                                </div>
+                                <div class="col-span-2 text-center font-pixel text-stone-400 text-sm truncate">
+                                    ${item.id}
+                                </div>
+                                <div class="col-span-2 text-right pr-2 font-pixel text-stone-500 text-sm">
+                                    ${dateStr || '-'}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Update Metadata
+                sourceLabel.textContent = `* 資料來源: ${source}`;
+                sourceLabel.className = source.includes("Cloud") ? "text-green-500" : "text-stone-500";
+                document.getElementById('update-time').textContent = `Update: ${new Date().toLocaleString()}`;
+
+            } catch (err) {
+                listContainer.innerHTML = `<div class="p-8 text-center text-red-400">載入失敗: ${err.message}</div>`;
+            }
+        }
+
+        // Initialize
+        loadLeaderboard();
+    </script>
+</body>
+
+</html>

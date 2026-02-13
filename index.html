@@ -194,11 +194,17 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
-        // ==================== CONSTANTS ====================
+
+
+        // ==================== CONSTANTS & CONFIG ====================
+        // 🔹 請填入你的 Google Apps Script 網頁應用程式網址 (若要啟用全球排行榜)
+        // 格式: https://script.google.com/macros/s/......./exec
+        const GAS_API_URL = "";
+
         const GAME_TIME = {
-            REAL_HOURS_PER_GAME_DAY: 2,  // 2 real hours = 1 game day
-            BUSINESS_OPEN_HOUR: 11,      // 11 AM
-            BUSINESS_CLOSE_HOUR: 19,     // 7 PM
+            REAL_HOURS_PER_GAME_DAY: 4, // 4 real hours = 1 game day
+            BUSINESS_OPEN_HOUR: 10,
+            BUSINESS_CLOSE_HOUR: 22
         };
 
         const INGREDIENTS = {
@@ -1844,6 +1850,9 @@
             competitors: AI_COMPETITORS, // Dynamic copy
             is24h: false,
             lastOnline: Date.now(),
+            // Global Leaderboard
+            globalId: null,
+            lastLoginDate: null // Format: YYYY-MM
         };
 
         // ==================== OFFLINE REPORT MODAL ====================
@@ -1985,6 +1994,8 @@
             const [showMenu, setShowMenu] = useState(false);
             const [showResetConfirm, setShowResetConfirm] = useState(false);
             const [showChangelog, setShowChangelog] = useState(false);
+            const [showRegisterModal, setShowRegisterModal] = useState(false);
+            const [registerId, setRegisterId] = useState('');
             const [deferredPrompt, setDeferredPrompt] = useState(null);
 
             // Device detection
@@ -2009,6 +2020,7 @@
                     setDeferredPrompt(null);
                 }
             };
+
 
             // Helper: Calculate standard finance metrics from state
             const calculateFinance = (state) => {
@@ -2183,6 +2195,109 @@
                 return parsed;
             });
 
+            // Helper: Check if player is #1 in Total Rank
+            const checkIsNumberOne = () => {
+                // Calculate competitor totals
+                const { gameDay, gameHour } = getGameTime(gameState.gameStartTime);
+
+                // Hash variation logic (copied from render for consistency)
+                const hashVariation = (id, period) => {
+                    const seed = (typeof id === 'number' ? id : 1);
+                    const n = ((seed * 7 + period * 13 + 37) % 21 - 10) / 100;
+                    return 1 + n;
+                };
+
+                let maxCompetitorTotal = 0;
+                (gameState.competitors || []).forEach(c => {
+                    const dailyRevenue = Math.round(c.monthlyRevenue / 30);
+                    const totalDaysElapsed = (gameDay - 1) + (gameHour / 24);
+                    const variation = hashVariation(c.id, 0); // "0" for total period
+                    const total = Math.round(dailyRevenue * totalDaysElapsed * variation);
+                    if (total > maxCompetitorTotal) maxCompetitorTotal = total;
+                });
+
+                const playerTotal = gameState.metrics.total;
+                return playerTotal > maxCompetitorTotal;
+            };
+
+            const handleRegisterClick = () => {
+                if (!navigator.onLine) {
+                    alert("請先連接網路才能登錄紀錄！");
+                    return;
+                }
+
+                if (!checkIsNumberOne()) {
+                    alert("尚未達到「累積排行」第一名，繼續加油！");
+                    return;
+                }
+
+                const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+                if (gameState.lastLoginDate === currentMonth) {
+                    alert("本月已經登錄過囉！下個月再來挑戰吧。");
+                    return;
+                }
+
+                // Pre-fill ID if exists
+                if (gameState.globalId) {
+                    setRegisterId(gameState.globalId);
+                }
+                setShowMenu(false);
+                setShowRegisterModal(true);
+            };
+
+            const submitRegistration = async () => {
+                if (!registerId || registerId.length === 0) {
+                    alert("請輸入 ID");
+                    return;
+                }
+
+                const newRecord = {
+                    name: gameState.shopName,
+                    money: gameState.metrics.total,
+                    id: registerId,
+                    date: new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+                };
+
+                // 1. Try Global Backend (Google Sheets)
+                if (GAS_API_URL) {
+                    try {
+                        await fetch(GAS_API_URL, {
+                            method: "POST",
+                            mode: "no-cors",
+                            headers: { "Content-Type": "text/plain" },
+                            body: JSON.stringify(newRecord)
+                        });
+                        // GAS no-cors doesn't return response, assume success if no error
+                    } catch (e) {
+                        console.error("Global upload failed", e);
+                        alert("雲端上傳失敗，將僅保存於本地: " + e.message);
+                    }
+                }
+
+                // 2. Save to Local Storage (Always save locally as backup/cache)
+                try {
+                    const stored = localStorage.getItem('boba_global_leaderboard');
+                    let data = stored ? JSON.parse(stored) : [];
+                    data.push(newRecord);
+                    localStorage.setItem('boba_global_leaderboard', JSON.stringify(data));
+
+                    // Update state
+                    setGameState(prev => ({
+                        ...prev,
+                        globalId: registerId,
+                        lastLoginDate: new Date().toISOString().slice(0, 7)
+                    }));
+
+                    setShowRegisterModal(false);
+
+                    // Open leaderboard
+                    window.open('leaderboard.html', '_blank');
+
+                } catch (e) {
+                    alert("登錄失敗: " + e.message);
+                }
+            };
+
             // Initialize: Check for offline earnings and simulate competitors ONCE on mount
             useEffect(() => {
                 const now = Date.now();
@@ -2326,7 +2441,6 @@
                                 // Use Production Speed as probability weight
                                 // Target: 20-50 drinks per game hour?
                                 // 1 Game Hour = 300 real seconds (interval is 1s) -> No
-                                // Real hours/day = 2. 
                                 // 24 game hours = 120 minutes = 7200 seconds.
                                 // 1 game hour = 300 seconds.
 
@@ -2469,6 +2583,13 @@
                                         ) : null
                                     )}
                                     <PixelButton
+                                        variant="gold"
+                                        className="w-full"
+                                        onClick={handleRegisterClick}
+                                    >
+                                        🌍 登錄紀錄 (需連網)
+                                    </PixelButton>
+                                    <PixelButton
                                         variant="secondary"
                                         className="w-full"
                                         onClick={() => {
@@ -2499,7 +2620,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.2.2
+                                            Bubble Tea Tycoon v1.2.3
                                         </div>
                                         <a
                                             href="https://buymeacoffee.com/cokefever"
@@ -2529,6 +2650,44 @@
                         />
                     )}
 
+                    {showRegisterModal && (
+                        <div className="absolute inset-0 bg-black/90 z-[80] flex items-center justify-center p-6">
+                            <PixelPanel className="w-full max-w-sm p-6" variant="stone">
+                                <h2 className="font-silkscreen text-gold text-2xl mb-4 text-center">
+                                    登錄富豪榜
+                                </h2>
+                                <p className="font-pixel text-stoneLight text-sm mb-4 text-center">
+                                    恭喜成為本地首富！<br />請輸入您的代號以登錄全球榜單。
+                                </p>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block font-pixel text-stone mb-1">玩家代號 (ID)</label>
+                                        <input
+                                            type="text"
+                                            maxLength={10}
+                                            value={registerId}
+                                            onChange={(e) => setRegisterId(e.target.value.toUpperCase())}
+                                            placeholder="限10字元 (例: KING_BOBA)"
+                                            className="w-full bg-dirtDark border-2 border-stone text-white p-2 font-pixel text-lg uppercase outline-none focus:border-gold"
+                                        />
+                                    </div>
+                                    <div className="font-pixel text-xs text-stoneLight">
+                                        店名: <span className="text-white">{gameState.shopName}</span><br />
+                                        目前資產: <span className="text-grassLight">{formatMoney(gameState.metrics?.total || 0)}</span>
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <PixelButton variant="gold" className="flex-1" onClick={submitRegistration}>
+                                            送出登錄
+                                        </PixelButton>
+                                        <PixelButton variant="secondary" className="flex-1" onClick={() => setShowRegisterModal(false)}>
+                                            取消
+                                        </PixelButton>
+                                    </div>
+                                </div>
+                            </PixelPanel>
+                        </div>
+                    )}
+
                     {/* Changelog Modal */}
                     {showChangelog && (
                         <div className="absolute inset-0 bg-black/90 z-[70] flex items-center justify-center p-6" onClick={() => setShowChangelog(false)}>
@@ -2537,12 +2696,29 @@
                                     📝 更新內容
                                 </h2>
 
-                                {/* v1.2.2 */}
+                                {/* v1.2.3 */}
                                 <div className="mb-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-gold text-dirtDark font-pixel text-xs px-2 py-0.5 border-2 border-goldDark">NEW</span>
-                                        <span className="font-silkscreen text-white text-sm">v1.2.2</span>
+                                        <span className="font-silkscreen text-white text-sm">v1.2.3</span>
                                         <span className="font-pixel text-stone text-xs">2025.02.13</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>全球富豪榜 (模擬)</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            成為本地累積資產第一名後，可至選單登錄紀錄，與全球玩家一較高下！(目前為本地模擬)
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* v1.2.2 */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">前版</span>
+                                        <span className="font-silkscreen text-stoneLight text-sm">v1.2.2</span>
                                     </div>
                                     <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
                                         <div className="font-pixel text-white text-sm flex gap-2">
@@ -2550,52 +2726,14 @@
                                             <span>修正離線遊玩體驗</span>
                                         </div>
                                         <div className="font-pixel text-stoneLight text-xs pl-5">
-                                            修復了飛航模式下無法開啟遊戲的問題。請注意：更新後需在有網路環境下開啟一次遊戲以快取資源。
+                                            修復了飛航模式下無法開啟遊戲的問題。
                                         </div>
                                         <div className="font-pixel text-white text-sm flex gap-2">
                                             <span className="text-grassLight">✔</span>
                                             <span>開放飲料金額直接輸入</span>
                                         </div>
                                         <div className="font-pixel text-stoneLight text-xs pl-5">
-                                            點擊飲品售價數字可直接輸入金額，不再需要慢慢按 + - 按鈕。
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* v1.2.1 */}
-                                <div className="mb-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">過往</span>
-                                        <span className="font-silkscreen text-stoneLight text-sm">v1.2.1</span>
-                                    </div>
-                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
-                                        <div className="font-pixel text-white text-sm flex gap-2">
-                                            <span className="text-grassLight">✔</span>
-                                            <span>新增基底茶、奶類、配料</span>
-                                        </div>
-                                        <div className="font-pixel text-stoneLight text-xs pl-5">
-                                            基底茶新增四季春、普洱、抹茶、麥茶；新增奶類選擇（不加奶/奶精/鮮奶）；配料新增芋圓、地瓜圓、粉角、冰淇淋。
-                                        </div>
-                                        <div className="font-pixel text-white text-sm flex gap-2">
-                                            <span className="text-grassLight">✔</span>
-                                            <span>售價影響購買意願</span>
-                                        </div>
-                                        <div className="font-pixel text-stoneLight text-xs pl-5">
-                                            避免玩家設定不合理售價，建議定價為成本的 3~5 倍。超過 10 倍將無人購買。
-                                        </div>
-                                        <div className="font-pixel text-white text-sm flex gap-2">
-                                            <span className="text-grassLight">✔</span>
-                                            <span>排行榜修正</span>
-                                        </div>
-                                        <div className="font-pixel text-stoneLight text-xs pl-5">
-                                            NPC 營收數字現在會隨遊戲時間穩定增長，不再顯示為 0 或隨機跳動。
-                                        </div>
-                                        <div className="font-pixel text-white text-sm flex gap-2">
-                                            <span className="text-grassLight">✔</span>
-                                            <span>設備升級擴展至 10 級</span>
-                                        </div>
-                                        <div className="font-pixel text-stoneLight text-xs pl-5">
-                                            所有設備最高可升至 Lv.10；社群行銷改為每月收費制。
+                                            點擊飲品售價數字可直接輸入金額。
                                         </div>
                                     </div>
                                 </div>
