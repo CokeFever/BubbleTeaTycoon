@@ -207,6 +207,15 @@
                 { id: 'green-tea', name: '綠茶', cost: 5, attraction: 10, emoji: '🍃', trait: '清爽解膩' },
                 { id: 'oolong', name: '烏龍茶', cost: 7, attraction: 12, emoji: '🫖', trait: '高利潤品項' },
                 { id: 'winter-melon', name: '冬瓜茶', cost: 6, attraction: 8, emoji: '🧊', trait: '學生族首選' },
+                { id: 'qing-tea', name: '四季春', cost: 5, attraction: 11, emoji: '🌸', trait: '清香順口' },
+                { id: 'puerh', name: '普洱茶', cost: 8, attraction: 14, emoji: '🏔️', trait: '獨特陳香' },
+                { id: 'matcha', name: '抹茶', cost: 10, attraction: 16, emoji: '🍵', trait: '日式風味' },
+                { id: 'barley', name: '麥茶', cost: 4, attraction: 6, emoji: '🌾', trait: '無咖啡因' },
+            ],
+            milks: [
+                { id: 'none', name: '不加奶', cost: 0, attraction: 0, emoji: '🚫', trait: '純茶風味' },
+                { id: 'creamer', name: '奶精', cost: 3, attraction: 5, emoji: '🥛', trait: '經典奶茶' },
+                { id: 'fresh-milk', name: '鮮奶', cost: 8, attraction: 12, emoji: '🐄', trait: '拿鐵系列' },
             ],
             toppings: [
                 { id: 'boba', name: '珍珠', cost: 5, attraction: 20, emoji: '⚫', trait: '經典必備' },
@@ -220,6 +229,10 @@
                 { id: 'white-pearl', name: '寒天', cost: 10, attraction: 18, emoji: '⚪', trait: '低卡健康' },
                 { id: 'aloe', name: '蘆薈', cost: 9, attraction: 15, emoji: '🌵', trait: '養顏美容' },
                 { id: 'milk-foam', name: '奶蓋', cost: 15, attraction: 30, emoji: '☁️', trait: '網紅打卡' },
+                { id: 'taro-ball', name: '芋圓', cost: 7, attraction: 14, emoji: '🟣', trait: 'Q彈嚼勁' },
+                { id: 'sweet-potato', name: '地瓜圓', cost: 6, attraction: 12, emoji: '🟠', trait: '古早甜味' },
+                { id: 'fen-jiao', name: '粉角', cost: 5, attraction: 11, emoji: '🔶', trait: '韌性口感' },
+                { id: 'ice-cream', name: '冰淇淋', cost: 12, attraction: 22, emoji: '🍦', trait: '甜蜜加倍' },
             ],
         };
 
@@ -261,20 +274,37 @@
 
         const calculateDrinkCost = (drink) => {
             const base = INGREDIENTS.bases.find(b => b.id === drink.base);
+            const milk = INGREDIENTS.milks.find(m => m.id === (drink.milk || 'none'));
             const toppingsCost = drink.toppings.reduce((sum, t) => {
                 const topping = INGREDIENTS.toppings.find(tp => tp.id === t);
                 return sum + (topping?.cost || 0);
             }, 0);
-            return (base?.cost || 0) + toppingsCost;
+            return (base?.cost || 0) + (milk?.cost || 0) + toppingsCost;
         };
 
         const calculateAttraction = (drink) => {
             const base = INGREDIENTS.bases.find(b => b.id === drink.base);
+            const milk = INGREDIENTS.milks.find(m => m.id === (drink.milk || 'none'));
             const toppingsAttraction = drink.toppings.reduce((sum, t) => {
                 const topping = INGREDIENTS.toppings.find(tp => tp.id === t);
                 return sum + (topping?.attraction || 0);
             }, 0);
-            return (base?.attraction || 0) + toppingsAttraction;
+            return (base?.attraction || 0) + (milk?.attraction || 0) + toppingsAttraction;
+        };
+
+        // Price sensitivity: price/cost ratio affects willingness to buy
+        const calculatePriceFactor = (drink) => {
+            const cost = calculateDrinkCost(drink);
+            if (cost <= 0) return 0;
+            const ratio = drink.price / cost;
+            // Sweet spot: 3x~5x markup = full willingness
+            // >5x~8x: willingness drops sharply
+            // >8x~10x: almost no one buys
+            // >10x: absolutely no one buys
+            if (ratio <= 5) return 1.0;
+            if (ratio <= 8) return Math.max(0.05, 1.0 - (ratio - 5) * 0.3);
+            if (ratio <= 10) return Math.max(0.01, 0.1 - (ratio - 8) * 0.045);
+            return 0; // No one buys at 10x+ markup
         };
 
         // ==================== PIXEL COMPONENTS ====================
@@ -1135,7 +1165,7 @@
                                         <div>
                                             <div className="text-white text-lg leading-tight">{currentOrder.name}</div>
                                             <div className="text-stoneLight text-xs mt-1">
-                                                {currentOrder.base} + {currentOrder.toppings.length}
+                                                {currentOrder.base} + {INGREDIENTS.milks.find(m => m.id === (currentOrder.milk || 'none'))?.name || '不加奶'} + {currentOrder.toppings.length}料
                                             </div>
                                         </div>
                                         <div className="text-right text-gold text-xl border-t border-stoneDark pt-1">
@@ -1175,11 +1205,13 @@
         const MenuEditor = ({ drink, onSave, onCancel }) => {
             const [name, setName] = useState(drink?.name || '新品項');
             const [base, setBase] = useState(drink?.base || INGREDIENTS.bases[0].id);
+            const [milk, setMilk] = useState(drink?.milk || 'none');
             const [toppings, setToppings] = useState(drink?.toppings || []);
             const [price, setPrice] = useState(drink?.price || 50);
 
-            const currentCost = calculateDrinkCost({ base, toppings });
-            const currentAttraction = calculateAttraction({ base, toppings });
+            const currentCost = calculateDrinkCost({ base, milk, toppings });
+            const currentAttraction = calculateAttraction({ base, milk, toppings });
+            const currentPriceFactor = calculatePriceFactor({ base, milk, toppings, price });
 
             const toggleTopping = (tid) => {
                 if (toppings.includes(tid)) {
@@ -1227,6 +1259,29 @@
                                     >
                                         <div className="font-pixel">{b.emoji} {b.name}</div>
                                         <div className="font-pixel text-xs opacity-75">${b.cost} | ⭐{b.attraction}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Milk Selection */}
+                        <div>
+                            <label className="block font-pixel text-stone mb-1">奶類選擇</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {INGREDIENTS.milks.map(m => (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setMilk(m.id); }}
+                                        className={`
+                                                p-2 border-2 text-left transition-colors
+                                                ${milk === m.id
+                                                ? 'bg-grass border-grassDark text-white'
+                                                : 'bg-stoneDark border-stone text-stoneLight'}
+                                            `}
+                                    >
+                                        <div className="font-pixel text-sm">{m.emoji} {m.name}</div>
+                                        <div className="font-pixel text-xs opacity-75">${m.cost}</div>
                                     </button>
                                 ))}
                             </div>
@@ -1283,6 +1338,17 @@
                                 <div className="flex justify-between">
                                     <span>總吸引力:</span> <span className="text-gold">{currentAttraction}</span>
                                 </div>
+                                <div className="flex justify-between">
+                                    <span>購買意願:</span>
+                                    <span className={currentPriceFactor >= 0.8 ? 'text-grassLight' : currentPriceFactor >= 0.3 ? 'text-yellow-400' : 'text-red-400'}>
+                                        {currentPriceFactor <= 0 ? '🚫 無人購買' : `${Math.round(currentPriceFactor * 100)}%`}
+                                    </span>
+                                </div>
+                                {price / currentCost > 5 && (
+                                    <div className="text-red-400 text-xs mt-1">
+                                        ⚠️ 售價過高！建議定價為成本的 3~5 倍 (${currentCost * 3}~${currentCost * 5})
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1294,7 +1360,7 @@
                             className="flex-1"
                             onClick={() => onSave({
                                 id: drink?.id || Date.now(),
-                                name, base, toppings, price
+                                name, base, milk, toppings, price
                             })}
                         >
                             確定
@@ -1469,10 +1535,10 @@
                             <div>
                                 <h3 className="font-pixel text-gold text-xl mb-4">⚙️ 設備升級</h3>
                                 {[
-                                    { id: 'teaMachine', name: '萃茶機', icon: '♨️', description: '加快製作速度，提升顧客翻桌率。', maxLevel: 5, baseCost: 2000 },
-                                    { id: 'iceMachine', name: '製冰機', icon: '❄️', description: '提升飲品品質，微幅增加吸引力與轉化率。', maxLevel: 3, baseCost: 5000 },
-                                    { id: 'sealingMachine', name: '封口機', icon: '🥤', description: '加快打包速度，進一步提升製作效率。', maxLevel: 5, baseCost: 1500 },
-                                    { id: 'marketing', name: '社群行銷', icon: '📢', description: '提升品牌知名度，增加基礎過路客流量。', maxLevel: 10, baseCost: 3000 }, // New pseudo-equipment
+                                    { id: 'teaMachine', name: '萃茶機', icon: '♨️', description: '加快製作速度，提升顧客翻桌率。', maxLevel: 10, baseCost: 2000 },
+                                    { id: 'iceMachine', name: '製冰機', icon: '❄️', description: '提升飲品品質，微幅增加吸引力與轉化率。', maxLevel: 10, baseCost: 5000 },
+                                    { id: 'sealingMachine', name: '封口機', icon: '🥤', description: '加快打包速度，進一步提升製作效率。', maxLevel: 10, baseCost: 1500 },
+                                    { id: 'marketing', name: '社群行銷', icon: '📢', description: '提升品牌知名度，增加基礎過路客流量。(每月收費)', maxLevel: 10, baseCost: 3000, isMonthly: true },
                                 ].map(item => (
                                     <UpgradeItem
                                         key={item.id}
@@ -1535,25 +1601,45 @@
                                         <span className="text-grassLight">{formatMoney(metrics.details.revenue)}</span>
                                     </div>
                                     <div className="space-y-1 px-2 pt-1">
-                                        <div className="flex justify-between font-pixel text-sm text-stone">
-                                            <span>食材成本 (COGS)</span>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">食材成本 (COGS)</span>
                                             <span className="text-red-400">-{formatMoney(metrics.details.cogs)}</span>
                                         </div>
-                                        <div className="flex justify-between font-pixel text-sm text-stone">
-                                            <span>員工薪資</span>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">員工薪資</span>
                                             <span className="text-red-400">-{formatMoney(metrics.details.staff)}</span>
                                         </div>
-                                        <div className="flex justify-between font-pixel text-sm text-stone">
-                                            <span>店面租金</span>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">勞健保 (雇主負擔)</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.laborInsurance)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">年終獎金預提</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.yearEndBonusAccrual)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">店面租金</span>
                                             <span className="text-red-400">-{formatMoney(metrics.details.rent)}</span>
                                         </div>
-                                        <div className="flex justify-between font-pixel text-sm text-stone">
-                                            <span>水電雜支</span>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">水電雜支</span>
                                             <span className="text-red-400">-{formatMoney(metrics.details.utilities)}</span>
                                         </div>
-                                        <div className="flex justify-between font-pixel text-sm text-stone">
-                                            <span>設備維護</span>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">設備維護</span>
                                             <span className="text-red-400">-{formatMoney(metrics.details.maintenance)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">社群行銷</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.marketingFee || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">營業稅 (5%)</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.businessTax)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-pixel text-sm">
+                                            <span className="text-stoneLight">福利金</span>
+                                            <span className="text-red-400">-{formatMoney(metrics.details.welfareFund)}</span>
                                         </div>
                                     </div>
 
@@ -1563,6 +1649,24 @@
                                             <span className={`font-pixel text-2xl ${metrics.monthlyProjection > 0 ? 'text-grassLight' : 'text-red-500'}`}>
                                                 {formatMoney(metrics.monthlyProjection)}
                                             </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Year-End Bonus Estimate */}
+                                    <div className="mt-3 p-3 bg-dirtDark border-2 border-stoneDark">
+                                        <div className="font-pixel text-gold text-sm mb-2">🎊 年終獎金預估</div>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between font-pixel text-xs">
+                                                <span className="text-stoneLight">每月預提</span>
+                                                <span className="text-yellow-400">{formatMoney(metrics.details.yearEndBonusAccrual)}</span>
+                                            </div>
+                                            <div className="flex justify-between font-pixel text-xs">
+                                                <span className="text-stoneLight">年度預估總額 (1.5個月)</span>
+                                                <span className="text-gold">{formatMoney(metrics.details.yearEndBonusAccrual * 12)}</span>
+                                            </div>
+                                            <div className="font-pixel text-stone text-[10px] mt-1">
+                                                * 以員工月薪 × 1.5 個月為基準，分 12 個月攤提
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1596,12 +1700,41 @@
 
                                 {(() => {
                                     // Prepare Data
+                                    // Competitors accumulate revenue over game time
+                                    const { gameDay, gameHour } = getGameTime(gameState.gameStartTime);
+                                    const gameMonth = Math.floor((gameDay - 1) / 30) + 1;
+                                    const dayInMonth = ((gameDay - 1) % 30) + 1;
+
+                                    // Deterministic variation per competitor (no Math.random!)
+                                    // Uses competitor ID + time period to create stable "noise"
+                                    const hashVariation = (id, period) => {
+                                        const seed = (typeof id === 'number' ? id : 1);
+                                        const n = ((seed * 7 + period * 13 + 37) % 21 - 10) / 100; // -0.10 ~ +0.10
+                                        return 1 + n;
+                                    };
+
                                     const getMetric = (c, isPlayer) => {
                                         if (isPlayer) return gameState.metrics?.[rankPeriod] || 0;
-                                        // AI Logic
-                                        if (rankPeriod === 'daily') return Math.round(c.monthlyRevenue / 30);
-                                        if (rankPeriod === 'total') return c.monthlyRevenue * 12;
-                                        return c.monthlyRevenue;
+
+                                        // AI competitors accumulate revenue based on game time
+                                        const dailyRevenue = Math.round(c.monthlyRevenue / 30);
+
+                                        if (rankPeriod === 'daily') {
+                                            // Today's accumulated revenue proportional to hours passed (0~24h)
+                                            const dayProgress = Math.min(1, gameHour / 24);
+                                            const variation = hashVariation(c.id, gameDay);
+                                            return Math.round(dailyRevenue * dayProgress * variation);
+                                        }
+                                        if (rankPeriod === 'monthly') {
+                                            // This month's accumulated revenue up to current day + hour
+                                            const daysElapsed = (dayInMonth - 1) + (gameHour / 24);
+                                            const variation = hashVariation(c.id, gameMonth);
+                                            return Math.round(dailyRevenue * daysElapsed * variation);
+                                        }
+                                        // Total: all revenue from game start to now
+                                        const totalDaysElapsed = (gameDay - 1) + (gameHour / 24);
+                                        const variation = hashVariation(c.id, 0);
+                                        return Math.round(dailyRevenue * totalDaysElapsed * variation);
                                     };
 
                                     const list = [
@@ -1672,8 +1805,8 @@
             lastOrderNumber: 0, // Sequential order ID for POS
             metrics: { daily: 0, monthly: 0, total: 0 },
             menu: [
-                { id: 1, base: 'black-tea', toppings: ['boba'], price: 50, name: '珍珠紅茶' }, // Adjusted Price
-                { id: 2, base: 'green-tea', toppings: [], price: 30, name: '純綠茶' },
+                { id: 1, base: 'black-tea', milk: 'none', toppings: ['boba'], price: 50, name: '珍珠紅茶' },
+                { id: 2, base: 'green-tea', milk: 'none', toppings: [], price: 30, name: '純綠茶' },
             ],
             equipment: {
                 teaMachine: 1,
@@ -1832,6 +1965,7 @@
             const [offlineReport, setOfflineReport] = useState(null);
             const [showMenu, setShowMenu] = useState(false);
             const [showResetConfirm, setShowResetConfirm] = useState(false);
+            const [showChangelog, setShowChangelog] = useState(false);
             const [deferredPrompt, setDeferredPrompt] = useState(null);
 
             // Device detection
@@ -1860,7 +1994,7 @@
             // Helper: Calculate standard finance metrics from state
             const calculateFinance = (state) => {
                 const emptyBreakdown = { total: 1, coverage: 1, manager: 1, overcrowding: 0 };
-                const emptyDetails = { revenue: 0, cogs: 0, rent: state.financials.rent, staff: 0, utilities: 0, maintenance: 0 };
+                const emptyDetails = { revenue: 0, cogs: 0, rent: state.financials.rent, staff: 0, utilities: 0, maintenance: 0, marketingFee: 0, businessTax: 0, laborInsurance: 0, welfareFund: 0, yearEndBonusAccrual: 0 };
 
                 if (state.menu.length === 0) {
                     return {
@@ -1919,8 +2053,11 @@
                 const productionSpeed = (1 + speedBonus) * efficiencyFactor;
                 // ------------------------------
 
+                // Price sensitivity: average price factor across menu
+                const avgPriceFactor = state.menu.reduce((sum, d) => sum + calculatePriceFactor(d), 0) / state.menu.length;
+
                 const baseTraffic = 100 * (1 + (state.reputation / 1000)) * (1 + marketingBonus);
-                const conversionRate = Math.min(0.8, (0.3 + (avgAttraction / 100) + qualityBonus));
+                const conversionRate = Math.min(0.8, (0.3 + (avgAttraction / 100) + qualityBonus)) * avgPriceFactor;
 
                 // Efficiency affects volume (can't serve everyone if staff is low)
                 const hourlyVolume = baseTraffic * conversionRate * (1 + speedBonus) * efficiencyFactor;
@@ -1943,8 +2080,13 @@
                 const monthlyUtilities = Math.round(utilitiesBase + utilitiesVariable);
 
                 // 3. Maintenance (設備維修)
-                const equipmentLvSum = Object.values(state.equipment).reduce((a, b) => a + b, 0);
-                const monthlyMaintenance = equipmentLvSum * 500;
+                // Hardware equipment maintenance (excludes marketing)
+                const hwEquipLvSum = (state.equipment.teaMachine || 0) + (state.equipment.iceMachine || 0) + (state.equipment.sealingMachine || 0);
+                const monthlyMaintenance = hwEquipLvSum * 500;
+
+                // Marketing monthly subscription fee
+                const marketingLevel = state.equipment.marketing || 0;
+                const monthlyMarketingFee = marketingLevel > 0 ? Math.round(3000 * marketingLevel * 0.8) : 0;
 
                 // 4. Existing Fixed Costs
                 const rent = state.financials.rent;
@@ -1952,7 +2094,24 @@
                 // ----------------------
 
                 const grossRevenueMonthly = Math.round(monthlyVolume * avgPrice);
-                const monthlyExpenses = Math.round(rent + staffCost + monthlyCOGS + monthlyUtilities + monthlyMaintenance);
+
+                // 5. Business Tax (營業稅 5% on revenue)
+                const businessTax = Math.round(grossRevenueMonthly * 0.05);
+
+                // 6. Labor & Health Insurance (勞健保 - employer's share ~14.02%)
+                // 勞保: ~11.48% employer share, 健保: ~5.17% employer share → simplified ~14%
+                const laborInsurance = Math.round(staffCost * 0.14);
+
+                // 7. Employee Welfare Fund (福利金)
+                // 按營收 0.5% 提撥, 有員工時最低 $1,500/月
+                const hasStaff = (ft + pt + mgr) > 0;
+                const welfareFund = hasStaff ? Math.max(1500, Math.round(grossRevenueMonthly * 0.005)) : 0;
+
+                // 8. Year-End Bonus Accrual (年終獎金預提)
+                // 預估 1.5 個月年終, 分攤至每月提撥
+                const yearEndBonusAccrual = Math.round(staffCost * 1.5 / 12);
+
+                const monthlyExpenses = Math.round(rent + staffCost + monthlyCOGS + monthlyUtilities + monthlyMaintenance + monthlyMarketingFee + businessTax + laborInsurance + welfareFund + yearEndBonusAccrual);
                 const monthlyProjection = grossRevenueMonthly - monthlyExpenses;
 
                 return {
@@ -1968,7 +2127,12 @@
                         rent: rent,
                         staff: staffCost,
                         utilities: monthlyUtilities,
-                        maintenance: monthlyMaintenance
+                        maintenance: monthlyMaintenance,
+                        marketingFee: monthlyMarketingFee,
+                        businessTax: businessTax,
+                        laborInsurance: laborInsurance,
+                        welfareFund: welfareFund,
+                        yearEndBonusAccrual: yearEndBonusAccrual
                     },
                     efficiencyBreakdown: {
                         total: efficiencyFactor,
@@ -2150,8 +2314,9 @@
                                 // If volume is 50 drinks/hour -> 1 drink every 6 seconds.
                                 // Chance = 1/6 ~ 16%.
                                 const finance = calculateFinance(prev);
-                                // Simplified: 10% base chance * speed
-                                const chance = 0.15 * finance.productionSpeed;
+                                // Price sensitivity affects background sales too
+                                const avgPF = prev.menu.reduce((sum, d) => sum + calculatePriceFactor(d), 0) / prev.menu.length;
+                                const chance = 0.15 * finance.productionSpeed * avgPF;
 
                                 if (Math.random() < chance) {
                                     // Sell a random drink
@@ -2285,6 +2450,16 @@
                                         ) : null
                                     )}
                                     <PixelButton
+                                        variant="secondary"
+                                        className="w-full"
+                                        onClick={() => {
+                                            setShowMenu(false);
+                                            setShowChangelog(true);
+                                        }}
+                                    >
+                                        📝 更新內容
+                                    </PixelButton>
+                                    <PixelButton
                                         variant="danger"
                                         className="w-full"
                                         onClick={() => {
@@ -2305,7 +2480,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.1.6
+                                            Bubble Tea Tycoon v1.2.1
                                         </div>
                                         <a
                                             href="https://buymeacoffee.com/cokefever"
@@ -2333,6 +2508,74 @@
                                 setShowResetConfirm(false);
                             }}
                         />
+                    )}
+
+                    {/* Changelog Modal */}
+                    {showChangelog && (
+                        <div className="absolute inset-0 bg-black/90 z-[70] flex items-center justify-center p-6" onClick={() => setShowChangelog(false)}>
+                            <PixelPanel className="w-full max-w-sm p-5 max-h-[80vh] overflow-y-auto" variant="dirt" onClick={e => e.stopPropagation()}>
+                                <h2 className="font-silkscreen text-gold text-xl mb-4 text-center">
+                                    📝 更新內容
+                                </h2>
+
+                                {/* v1.2.1 */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-gold text-dirtDark font-pixel text-xs px-2 py-0.5 border-2 border-goldDark">NEW</span>
+                                        <span className="font-silkscreen text-white text-sm">v1.2.1</span>
+                                        <span className="font-pixel text-stone text-xs">2025.02.13</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>新增基底茶、奶類、配料</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            基底茶新增四季春、普洱、抹茶、麥茶；新增奶類選擇（不加奶/奶精/鮮奶）；配料新增芋圓、地瓜圓、粉角、冰淇淋。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>售價影響購買意願</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            避免玩家設定不合理售價，建議定價為成本的 3~5 倍。超過 10 倍將無人購買。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>排行榜修正</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            NPC 營收數字現在會隨遊戲時間穩定增長，不再顯示為 0 或隨機跳動。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>設備升級擴展至 10 級</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            所有設備最高可升至 Lv.10；社群行銷改為每月收費制。
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* v1.1.0 - older */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">過往</span>
+                                        <span className="font-silkscreen text-stoneLight text-sm">v1.1.0</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-1">
+                                        <div className="font-pixel text-stoneLight text-sm">• PWA 離線遊玩與安裝支援</div>
+                                        <div className="font-pixel text-stoneLight text-sm">• 行人 AI 與場景景深效果</div>
+                                        <div className="font-pixel text-stoneLight text-sm">• 離線報告彈窗特效</div>
+                                        <div className="font-pixel text-stoneLight text-sm">• Google Analytics 追蹤整合</div>
+                                    </div>
+                                </div>
+
+                                <PixelButton variant="secondary" className="w-full mt-2" onClick={() => setShowChangelog(false)}>
+                                    關閉
+                                </PixelButton>
+                            </PixelPanel>
+                        </div>
                     )}
                 </div>
             );
