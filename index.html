@@ -243,11 +243,11 @@
         };
 
         const AI_COMPETITORS = [
-            { id: 1, name: '強尼紅茶公社', monthlyRevenue: 1200000, tier: '傳奇', color: '#ff6b6b' },
-            { id: 2, name: '60嵐', monthlyRevenue: 850000, tier: '困難', color: '#ffa502' },
-            { id: 3, name: '大名本位', monthlyRevenue: 500000, tier: '普通', color: '#2ed573' },
-            { id: 4, name: 'OG智慧製茶', monthlyRevenue: 250000, tier: '穩健', color: '#1e90ff' },
-            { id: 5, name: '沒飲 Noin', monthlyRevenue: 80000, tier: '新手', color: '#a4b0be' },
+            { id: 1, name: '強尼紅茶公社', monthlyRevenue: 1500000, efficiency: 0.99, tier: '傳奇', color: '#ff6b6b' },
+            { id: 2, name: '60嵐', monthlyRevenue: 1000000, efficiency: 0.95, tier: '困難', color: '#ffa502' },
+            { id: 3, name: '大名本位', monthlyRevenue: 700000, efficiency: 0.90, tier: '普通', color: '#2ed573' },
+            { id: 4, name: 'OG智慧製茶', monthlyRevenue: 400000, efficiency: 0.85, tier: '穩健', color: '#1e90ff' },
+            { id: 5, name: '沒飲 Noin', monthlyRevenue: 150000, efficiency: 0.80, tier: '新手', color: '#a4b0be' },
         ];
 
 
@@ -627,7 +627,7 @@
                         <h2 className="font-silkscreen text-white text-xl mb-2 text-center" style={{ color: shop.color }}>
                             {shop.name}
                         </h2>
-                        <div className="text-center font-pixel text-stone mb-4">{shop.tier} 對手</div>
+                        <div className="text-center font-pixel text-stone mb-4">{shop.tier} 對手 | 效率: {Math.round((shop.efficiency || 0.8) * 100)}%</div>
 
                         <div className="bg-dirtDark p-3 border-2 border-stoneDark space-y-2">
                             <h3 className="font-pixel text-gold mb-2 border-b border-stoneDark pb-1">市場調查 (Menu)</h3>
@@ -1759,7 +1759,8 @@
                                         // Total: all revenue from game start to now
                                         const totalDaysElapsed = (gameDay - 1) + (gameHour / 24);
                                         const variation = hashVariation(c.id, 0);
-                                        return Math.round(dailyRevenue * totalDaysElapsed * variation);
+                                        const efficiency = c.efficiency || 0.8;
+                                        return Math.round(dailyRevenue * totalDaysElapsed * variation * efficiency);
                                     };
 
                                     const list = [
@@ -1997,6 +1998,7 @@
             const [showRegisterModal, setShowRegisterModal] = useState(false);
             const [registerModalMode, setRegisterModalMode] = useState('form'); // 'form', 'offline', 'low_rank', 'already_registered'
             const [registerId, setRegisterId] = useState('');
+            const [isSubmitting, setIsSubmitting] = useState(false);
             const [deferredPrompt, setDeferredPrompt] = useState(null);
             const [showUpdatePrompt, setShowUpdatePrompt] = useState(false); // New PWA Update Prompt
 
@@ -2257,12 +2259,12 @@
                     return 1 + n;
                 };
 
-                let maxCompetitorTotal = 0;
                 (gameState.competitors || []).forEach(c => {
                     const dailyRevenue = Math.round(c.monthlyRevenue / 30);
                     const totalDaysElapsed = (gameDay - 1) + (gameHour / 24);
                     const variation = hashVariation(c.id, 0); // "0" for total period
-                    const total = Math.round(dailyRevenue * totalDaysElapsed * variation);
+                    const efficiency = c.efficiency || 0.8;
+                    const total = Math.round(dailyRevenue * totalDaysElapsed * variation * efficiency);
                     if (total > maxCompetitorTotal) maxCompetitorTotal = total;
                 });
 
@@ -2311,6 +2313,9 @@
                     return;
                 }
 
+                if (isSubmitting) return;
+                setIsSubmitting(true);
+
                 const newRecord = {
                     name: gameState.shopName,
                     money: gameState.metrics.total,
@@ -2355,6 +2360,8 @@
 
                 } catch (e) {
                     alert("登錄失敗: " + e.message);
+                } finally {
+                    setIsSubmitting(false);
                 }
             };
 
@@ -2680,7 +2687,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.2.4
+                                            Bubble Tea Tycoon v1.2.5
                                         </div>
                                         <a
                                             href="https://buymeacoffee.com/cokefever"
@@ -2764,8 +2771,8 @@
                                             目前資產: <span className="text-grassLight">{formatMoney(gameState.metrics?.total || 0)}</span>
                                         </div>
                                         <div className="flex gap-2 pt-2">
-                                            <PixelButton variant="gold" className="flex-1" onClick={submitRegistration}>
-                                                送出登錄
+                                            <PixelButton variant="gold" className="flex-1" onClick={submitRegistration} disabled={isSubmitting}>
+                                                {isSubmitting ? '處理中...' : '送出登錄'}
                                             </PixelButton>
                                             <PixelButton variant="secondary" className="flex-1" onClick={() => setShowRegisterModal(false)}>
                                                 取消
@@ -2785,11 +2792,36 @@
                                     📝 更新內容
                                 </h2>
 
-                                {/* v1.2.4 */}
+                                {/* v1.2.5 */}
                                 <div className="mb-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-gold text-dirtDark font-pixel text-xs px-2 py-0.5 border-2 border-goldDark">NEW</span>
-                                        <span className="font-silkscreen text-white text-sm">v1.2.4</span>
+                                        <span className="font-silkscreen text-white text-sm">v1.2.5</span>
+                                        <span className="font-pixel text-stone text-xs">2025.02.18</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>優化電腦對手挑戰性</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            提升電腦 NPC 的營收基準與經營效率（最强可達 99% 效率），讓中後期遊戲更具挑戰性。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>修復登錄連點 Bug</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            修正了在登錄全球榜單時，重複點擊按鈕可能導致重複上傳資料的問題。
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* v1.2.4 */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">前版</span>
+                                        <span className="font-silkscreen text-stoneLight text-sm">v1.2.4</span>
                                         <span className="font-pixel text-stone text-xs">2025.02.13</span>
                                     </div>
                                     <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
