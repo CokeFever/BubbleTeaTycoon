@@ -2251,6 +2251,7 @@
             const checkIsNumberOne = () => {
                 // Calculate competitor totals
                 const { gameDay, gameHour } = getGameTime(gameState.gameStartTime);
+                let maxCompetitorTotal = 0;
 
                 // Hash variation logic (copied from render for consistency)
                 const hashVariation = (id, period) => {
@@ -2281,18 +2282,18 @@
                     return;
                 }
 
-                // 2. Check Ranking
-                if (!checkIsNumberOne()) {
-                    setRegisterModalMode('low_rank');
+                // 2. Check Monthly Limit (Priority so already registered players can see the "View Leaderboard" button)
+                const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+                if (gameState.lastLoginDate === currentMonth) {
+                    setRegisterModalMode('already_registered');
                     setShowMenu(false);
                     setShowRegisterModal(true);
                     return;
                 }
 
-                // 3. Check Monthly Limit
-                const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-                if (gameState.lastLoginDate === currentMonth) {
-                    setRegisterModalMode('already_registered');
+                // 3. Check Ranking
+                if (!checkIsNumberOne()) {
+                    setRegisterModalMode('low_rank');
                     setShowMenu(false);
                     setShowRegisterModal(true);
                     return;
@@ -2687,7 +2688,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.2.5
+                                            Bubble Tea Tycoon v1.2.6
                                         </div>
                                         <a
                                             href="https://buymeacoffee.com/cokefever"
@@ -2792,11 +2793,29 @@
                                     📝 更新內容
                                 </h2>
 
-                                {/* v1.2.5 */}
+                                {/* v1.2.6 */}
                                 <div className="mb-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-gold text-dirtDark font-pixel text-xs px-2 py-0.5 border-2 border-goldDark">NEW</span>
-                                        <span className="font-silkscreen text-white text-sm">v1.2.5</span>
+                                        <span className="font-silkscreen text-white text-sm">v1.2.6</span>
+                                        <span className="font-pixel text-stone text-xs">2025.02.18</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>修復登錄按鈕失效問題</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            修正了「登錄記錄」按鈕在特定情況下點擊無反應的程式錯誤，並優化了已登錄玩家查看榜單的流程。
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* v1.2.5 */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">前版</span>
+                                        <span className="font-silkscreen text-stoneLight text-sm">v1.2.5</span>
                                         <span className="font-pixel text-stone text-xs">2025.02.18</span>
                                     </div>
                                     <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
@@ -2884,20 +2903,6 @@
                                             <span className="text-grassLight">✔</span>
                                             <span>排行榜修正與設備擴展</span>
                                         </div>
-                                    </div>
-                                </div>
-
-                                {/* v1.1.0 - older */}
-                                <div className="mb-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">過往</span>
-                                        <span className="font-silkscreen text-stoneLight text-sm">v1.1.0</span>
-                                    </div>
-                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-1">
-                                        <div className="font-pixel text-stoneLight text-sm">• PWA 離線遊玩與安裝支援</div>
-                                        <div className="font-pixel text-stoneLight text-sm">• 行人 AI 與場景景深效果</div>
-                                        <div className="font-pixel text-stoneLight text-sm">• 離線報告彈窗特效</div>
-                                        <div className="font-pixel text-stoneLight text-sm">• Google Analytics 追蹤整合</div>
                                     </div>
                                 </div>
 
