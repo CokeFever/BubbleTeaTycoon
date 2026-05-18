@@ -60,24 +60,56 @@ function handleRequest(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     
-    // POST request: Add record
+    // POST request: Add/Update record
     const params = JSON.parse(e.postData.contents);
-    const id = params.id;
-    const name = params.name;
+    
+    // Helper to sanitize strings (strip HTML tags to prevent XSS)
+    const sanitize = (str) => {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/<[^>]*>/g, '').trim();
+    };
+
+    const rawId = params.id;
+    const rawName = params.name;
     const money = Number(params.money);
     const date = params.date;
     
-    // Validation
-    if (!id || !name || isNaN(money)) {
+    const id = sanitize(rawId);
+    const name = sanitize(rawName);
+
+    // Validation: Require non-empty ID/Name, valid finite money, and set a reasonable upper limit (e.g. 1 Trillion)
+    // to prevent cheat injection of scientific notation / overflow values like 1e+232
+    if (!id || !name || isNaN(money) || !isFinite(money) || money < 0 || money > 1e12) {
        return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'Invalid Data'}))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Check if ID exists (Optional: Update if exists, or allow duplicates)
-    // For simplicity, we just append now.
-    // Ideally you should check if this ID+Date exists.
+    // Check if ID exists to update record instead of spamming duplicates
+    const data = sheet.getDataRange().getValues();
+    let idExists = false;
+    let existingRowIndex = -1;
     
-    sheet.appendRow([id, name, money, date, new Date()]);
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === id) {
+        idExists = true;
+        existingRowIndex = i + 1; // 1-indexed in Google Sheets, +1 due to headers shift
+        break;
+      }
+    }
+
+    if (idExists) {
+      const currentMoney = Number(data[existingRowIndex - 1][2]);
+      // Only update if the new money score is higher
+      if (money > currentMoney) {
+        sheet.getRange(existingRowIndex, 2).setValue(name); // Column B: Name
+        sheet.getRange(existingRowIndex, 3).setValue(money); // Column C: Money
+        sheet.getRange(existingRowIndex, 4).setValue(date);  // Column D: Date
+        sheet.getRange(existingRowIndex, 5).setValue(new Date()); // Column E: Timestamp
+      }
+    } else {
+      // Append a new row if ID doesn't exist
+      sheet.appendRow([id, name, money, date, new Date()]);
+    }
     
     return ContentService.createTextOutput(JSON.stringify({result: 'success'}))
       .setMimeType(ContentService.MimeType.JSON);

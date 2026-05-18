@@ -2688,7 +2688,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.2.6
+                                            Bubble Tea Tycoon v1.2.7
                                         </div>
                                         <a
                                             href="https://buymeacoffee.com/cokefever"
@@ -2793,11 +2793,36 @@
                                     📝 更新內容
                                 </h2>
 
-                                {/* v1.2.6 */}
+                                {/* v1.2.7 */}
                                 <div className="mb-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-gold text-dirtDark font-pixel text-xs px-2 py-0.5 border-2 border-goldDark">NEW</span>
-                                        <span className="font-silkscreen text-white text-sm">v1.2.6</span>
+                                        <span className="font-silkscreen text-white text-sm">v1.2.7</span>
+                                        <span className="font-pixel text-stone text-xs">2026.05.18</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>防範全球排行榜 XSS 注入漏洞</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            修正了排行榜展示時未過濾 HTML 的安全漏洞，並加入了強固的輸入端與渲染端轉義機制。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>防堵異常數值與重複 ID 覆寫機制</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            優化 Apps Script 排行榜資料庫驗證，拒絕不合理的極端數值（防止作弊），並支援同 ID 資料覆蓋覆寫以避免版面重複灌水。
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* v1.2.6 */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">前版</span>
+                                        <span className="font-silkscreen text-stoneLight text-sm">v1.2.6</span>
                                         <span className="font-pixel text-stone text-xs">2025.02.18</span>
                                     </div>
                                     <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">

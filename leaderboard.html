@@ -106,8 +106,21 @@
         // 🔹 與遊戲主程式 index.html 保持一致
         const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxB6xkywjO--gYgmmLmYh0vxbk2xVlQDudtduWzt1REdvGIeRCVY-z1FaUkM72rK1U/exec";
 
+        // Escape HTML helper to prevent XSS
+        const escapeHTML = (str) => {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        };
+
         // Format money helper
         const formatMoney = (amount) => {
+            if (isNaN(amount) || amount === null || amount === undefined) return '$0';
+            if (!isFinite(amount) || amount > 1e15) return '溢出 / Overflow';
             if (amount >= 100000000) return `$${(amount / 100000000).toFixed(2)}億`;
             if (amount >= 10000) return `$${(amount / 10000).toFixed(1)}萬`;
             return `$${amount}`;
@@ -184,22 +197,26 @@
                         let dateStr = item.date;
                         if (dateStr && dateStr.includes('T')) dateStr = dateStr.split('T')[0];
 
+                        const safeName = escapeHTML(item.name);
+                        const safeId = escapeHTML(item.id);
+                        const safeDate = escapeHTML(dateStr || '-');
+
                         return `
                             <div class="grid grid-cols-12 gap-2 p-3 items-center hover:bg-white/5 transition-colors ${bgClass}">
                                 <div class="col-span-1 text-center font-silkscreen text-xl ${rankColor}">
                                     ${index + 1}
                                 </div>
-                                <div class="col-span-4 pl-2 font-pixel text-white truncate text-lg" title="${item.name}">
-                                    ${item.name}
+                                <div class="col-span-4 pl-2 font-pixel text-white truncate text-lg" title="${safeName}">
+                                    ${safeName}
                                 </div>
                                 <div class="col-span-3 text-right font-pixel text-[#81c784] text-lg">
                                     ${formatMoney(item.money)}
                                 </div>
-                                <div class="col-span-2 text-center font-pixel text-stone-400 text-sm truncate">
-                                    ${item.id}
+                                <div class="col-span-2 text-center font-pixel text-stone-400 text-sm truncate" title="${safeId}">
+                                    ${safeId}
                                 </div>
                                 <div class="col-span-2 text-right pr-2 font-pixel text-stone-500 text-sm">
-                                    ${dateStr || '-'}
+                                    ${safeDate}
                                 </div>
                             </div>
                         `;
