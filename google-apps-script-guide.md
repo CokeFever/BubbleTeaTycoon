@@ -44,10 +44,10 @@ function handleRequest(e) {
       
       // Map to JSON
       const result = data.map(row => ({
-        id: row[0],
-        name: row[1],
+        id: String(row[0]),
+        name: String(row[1]),
         money: Number(row[2]),
-        date: row[3]
+        date: String(row[3])
       }));
       
       // Sort by Money DESC
@@ -63,40 +63,70 @@ function handleRequest(e) {
     // POST request: Add/Update record
     const params = JSON.parse(e.postData.contents);
     
-    // Helper to sanitize strings (strip HTML tags to prevent XSS)
-    const sanitize = (str) => {
-      if (str === null || str === undefined) return '';
-      return String(str).replace(/<[^>]*>/g, '').trim();
-    };
-
     const rawId = params.id;
     const rawName = params.name;
-    const money = Number(params.money);
-    const date = params.date;
+    const rawMoney = Number(params.money);
     
-    const id = sanitize(rawId);
-    const name = sanitize(rawName);
-
-    // Validation: Require non-empty ID/Name, valid finite money, and set a reasonable upper limit (e.g. 1 Trillion)
-    // to prevent cheat injection of scientific notation / overflow values like 1e+232
-    if (!id || !name || isNaN(money) || !isFinite(money) || money < 0 || money > 1e12) {
-       return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'Invalid Data'}))
+    // 1. Strict Server-side Type Check
+    if (typeof rawId !== 'string' || typeof rawName !== 'string' || isNaN(rawMoney) || !isFinite(rawMoney)) {
+      return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'Invalid Types'}))
         .setMimeType(ContentService.MimeType.JSON);
     }
-
+    
+    const id = rawId.trim();
+    const name = rawName.trim();
+    const money = Math.floor(rawMoney); // Force integer to prevent float cheating
+    
+    // 2. Strict Length Checks
+    if (id.length < 1 || id.length > 10 || name.length < 1 || name.length > 10) {
+      return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'Invalid Length'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 3. Formula Injection (CSV Injection) Prevention
+    // Reject if id or name starts with '=', '+', '-', '@'
+    const formulaRegex = /^[=\+\-@]/;
+    if (formulaRegex.test(id) || formulaRegex.test(name)) {
+      return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'Formula Injection Detected'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 4. HTML/XSS Brackets Check
+    if (id.indexOf('<') !== -1 || id.indexOf('>') !== -1 || name.indexOf('<') !== -1 || name.indexOf('>') !== -1) {
+      return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'HTML Injection Detected'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 5. Strict ID Regex (Only alphanumeric, spaces, hyphens, underscores, starting with alphanumeric)
+    const idRegex = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,9}$/;
+    if (!idRegex.test(id)) {
+      return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'Invalid ID Format'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 6. Reasonable Score Range Limit (0 to 1 Trillion)
+    if (money < 0 || money > 1e12) {
+      return ContentService.createTextOutput(JSON.stringify({result: 'error', error: 'Score Out of Range'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // 7. Secure Date Generation on Server Side (GMT+8 Taipei time)
+    // This discards client-controlled date parameters to prevent time-tampering/injections
+    const date = Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd");
+    
     // Check if ID exists to update record instead of spamming duplicates
     const data = sheet.getDataRange().getValues();
     let idExists = false;
     let existingRowIndex = -1;
     
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === id) {
+      if (String(data[i][0]).trim() === id) {
         idExists = true;
         existingRowIndex = i + 1; // 1-indexed in Google Sheets, +1 due to headers shift
         break;
       }
     }
-
+    
     if (idExists) {
       const currentMoney = Number(data[existingRowIndex - 1][2]);
       // Only update if the new money score is higher

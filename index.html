@@ -1965,7 +1965,14 @@
                                     <input
                                         type="text"
                                         value={shopName}
-                                        onChange={(e) => setShopName(e.target.value)}
+                                        onChange={(e) => {
+                                            let val = e.target.value;
+                                            if (/^[=\+\-@]/g.test(val)) {
+                                                val = val.replace(/^[=\+\-@]+/g, '');
+                                            }
+                                            val = val.replace(/[<>]/g, '');
+                                            setShopName(val);
+                                        }}
                                         placeholder="例：超級好喝茶"
                                         maxLength={10}
                                         className="w-full bg-dirtDark border-4 border-stone text-white p-3 font-pixel text-xl focus:border-gold outline-none"
@@ -2688,7 +2695,7 @@
                                 <div className="mt-4 pt-3 border-t border-stoneDark/30 text-center">
                                     <div className="flex flex-col items-center gap-1">
                                         <div className="text-[10px] font-silkscreen text-white/50 uppercase tracking-widest">
-                                            Bubble Tea Tycoon v1.2.7
+                                            Bubble Tea Tycoon v1.2.8
                                         </div>
                                         <a
                                             href="https://buymeacoffee.com/cokefever"
@@ -2762,7 +2769,14 @@
                                                 type="text"
                                                 maxLength={10}
                                                 value={registerId}
-                                                onChange={(e) => setRegisterId(e.target.value.toUpperCase())}
+                                                onChange={(e) => {
+                                                    let val = e.target.value.toUpperCase();
+                                                    val = val.replace(/[^A-Z0-9 _-]/g, '');
+                                                    if (/^[ _-]/g.test(val)) {
+                                                        val = val.replace(/^[ _-]+/g, '');
+                                                    }
+                                                    setRegisterId(val);
+                                                }}
                                                 placeholder="限10字元 (例: KING_BOBA)"
                                                 className="w-full bg-dirtDark border-2 border-stone text-white p-2 font-pixel text-lg uppercase outline-none focus:border-gold"
                                             />
@@ -2793,11 +2807,43 @@
                                     📝 更新內容
                                 </h2>
 
-                                {/* v1.2.7 */}
+                                {/* v1.2.8 */}
                                 <div className="mb-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-gold text-dirtDark font-pixel text-xs px-2 py-0.5 border-2 border-goldDark">NEW</span>
-                                        <span className="font-silkscreen text-white text-sm">v1.2.7</span>
+                                        <span className="font-silkscreen text-white text-sm">v1.2.8</span>
+                                        <span className="font-pixel text-stone text-xs">2026.05.21</span>
+                                    </div>
+                                    <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>徹底防堵全球試算表公式注入 (Formula Injection)</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            防阻以 =, +, -, @ 等字元開頭的惡意輸入，從源頭確保試算表後台資料安全與隱私防護。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>強固伺服器端 (GAS) 二次安全校驗</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            廢除對客戶端上傳日期的信任，改由伺服器自動生成 GMT+8 安全時間，並對玩家 ID 和店名進行嚴格的正則白名單與防注入過濾。
+                                        </div>
+                                        <div className="font-pixel text-white text-sm flex gap-2">
+                                            <span className="text-grassLight">✔</span>
+                                            <span>前端輸入即時校驗過濾</span>
+                                        </div>
+                                        <div className="font-pixel text-stoneLight text-xs pl-5">
+                                            引入即時過濾機制，從源頭阻截任何不合規的特殊符號與 XSS 語法。
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* v1.2.7 */}
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-stoneDark text-stoneLight font-pixel text-xs px-2 py-0.5 border-2 border-stone">前版</span>
+                                        <span className="font-silkscreen text-stoneLight text-sm">v1.2.7</span>
                                         <span className="font-pixel text-stone text-xs">2026.05.18</span>
                                     </div>
                                     <div className="bg-dirtDark border-2 border-stoneDark p-3 space-y-2">
