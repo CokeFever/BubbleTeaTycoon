@@ -11,7 +11,7 @@ description: 如何正確更新遊戲版本號並同步 PWA 快取
    - 在 `Changelog Modal` 區域新增或更新對應版本的內容。
 
 3. **同步修改 `sw.js` 中的快取名稱**：
-   - 找到 `const CACHE_NAME = 'boba-king-v...';`。
+   - 找到 `const CACHE_NAME = 'bubble-tea-tycoon-v...';`。
    - **必須** 將其中的版本號同步更新。這會觸發 PWA 的 Service Worker 更新機制。
 
 4. **驗證一致性**：

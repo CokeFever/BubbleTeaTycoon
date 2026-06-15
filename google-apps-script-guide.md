@@ -4,7 +4,7 @@
 
 ## 步驟 1：建立 Google Sheet
 1. 前往 [Google Sheets](https://sheets.google.com) 建立一個新試算表。
-2. 命名為 `BobaKing_GlobalRanking` (或其他你喜歡的名字)。
+2. 命名為 `BubbleTeaTycoon_GlobalRanking` (或其他你喜歡的名字)。
 3. 在第一列 (Row 1) 設定標題：
    - A1: `ID`
    - B1: `Name`

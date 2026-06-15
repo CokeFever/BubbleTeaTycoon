@@ -61,7 +61,7 @@
 
 由於 Google Sheets 的 Apps Script 代碼儲存在您的個人雲端，**請務必手動更新您的 Apps Script 程式碼**：
 
-1. 開啟您的 Google 試算表 `BobaKing_GlobalRanking`。
+1. 開啟您的 Google 試算表 `BubbleTeaTycoon_GlobalRanking`。
 2. 點選 **擴充功能 (Extensions)** > **Apps Script**。
 3. 將原本的 `Code.gs` 代碼**全部刪除**。
 4. 複製並貼上新版 `google-apps-script-guide.md` 中提供的 **重構後安全版 `Code.gs`** 代碼。
