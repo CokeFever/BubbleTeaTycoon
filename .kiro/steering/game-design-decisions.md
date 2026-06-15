@@ -8,9 +8,12 @@ inclusion: auto
 
 - **排名依據**：月營收（`monthlyMetric`），不使用總資產或永久累積營收
 - **重置週期**：現實日曆月（每月 1 號 00:00 UTC 重置）
+- **即時性**：排行榜每 5 分鐘從後端拉取最新排名，月中玩家可看到即時名次變動
+- **月底結算**：月底凍結排名，前 100 名（或前 3 名）存入歷史紀錄
+- **生涯最佳名次**：參考 Clash Royale 天梯賽季，玩家 profile 永久顯示歷史最高排名（例如 "Season Best: #7"），成為長期追求目標
 - **設計理念**：衡量「這個月你經營得多好」而非「你玩了多久」。有錢但不投資回店裡的不算好經營者，每月重新競爭讓新玩家有機會上榜
 - **解鎖門檻**：達到特定等級（全原料/設備解鎖後）才開放排行榜功能
-- **後端**：Unity 版使用 Firebase Firestore 或 GCP Cloud Run（不使用 Google Apps Script，GAS 僅限 PWA 版）
+- **後端**：Unity 版使用 Firebase Firestore 或 GCP Cloud Run（不使用 Google Apps Script，GAS 僅限 PWA 版），需支援 5 分鐘級別的即時查詢與月底批次結算
 
 ## 時間系統
 
